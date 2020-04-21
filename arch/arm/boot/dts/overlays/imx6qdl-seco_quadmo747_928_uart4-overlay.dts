@@ -1,0 +1,47 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-quadmo747_928", "fsl,imx6dl-quadmo747_928", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&uart4>;
+        __overlay__ {
+
+            status = "okay";
+
+		};
+	};
+
+	
+	fragment@1 {
+   		target = <&can1>;
+        __overlay__ {
+
+            status = "disabled";
+
+		};
+	};
+
+
+	fragment@2 {
+   		target = <&reg_uart_switch>;
+         __overlay__ {
+
+            status = "okay";
+
+	 	};
+	 };
+
+
+	fragment@3 {
+	    target = <&reg_flex_can_switch>;
+        __overlay__ {
+
+			status = "disabled";
+
+	 	};
+	 };
+
+
+};

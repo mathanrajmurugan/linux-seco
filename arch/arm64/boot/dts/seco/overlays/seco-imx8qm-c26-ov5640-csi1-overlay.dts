@@ -1,0 +1,118 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * OV5640 connected to csi1
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/imx8qm-clock.h>
+#include <dt-bindings/pinctrl/pads-imx8qm.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+        compatible = "fsl,imx8qm-mek","fsl,seco-imx8qm-c26", "fsl,imx8qm";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               OV5640 OVERLAY                             |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@0 {
+                target = <&isi_4>;
+                __overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@2 {
+                target = <&gpio0_mipi_csi1>;
+                __overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@3 {
+                target = <&i2c0_mipi_csi1>;
+                __overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+			ov5640_mipi: ov5640_mipi@3c {
+				compatible = "ovti,ov5640_mipi_v3";
+				reg = <0x3c>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_mipi_csi1_camera>;
+				clocks = <&clk IMX8QM_CLK_DUMMY>;
+				clock-names = "csi_mclk";
+				csi_id = <1>;
+				pwn-gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+				rst-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
+				mclk = <24000000>;
+				mclk_source = <0>;
+				mipi_csi;
+				status = "okay";
+				port {
+					ov5640_mipi_ep: endpoint {
+						remote-endpoint = <&mipi_csi1_ep>;
+					};
+				};
+			};
+		};	
+	};
+
+	fragment@4 {
+                target = <&mipi_csi_1>;
+                __overlay__ {
+		        status = "okay";
+			port@1 {
+				mipi_csi1_ep: endpoint {
+					remote-endpoint = <&ov5640_mipi_ep>;
+					data-lanes = <1 2>;
+				};
+			};
+		};
+	};
+
+	fragment@5 {
+                target = <&gpio2>;
+                __overlay__ {
+			status = "okay";
+		    line_b@0 {
+			gpio-hog;
+			gpios = <25 0>;
+			output-high;
+			line-name = "HDMI_SEL1";
+			};
+
+		    line_b@1 {
+			gpio-hog;
+			gpios = <26 0>;
+			output-high;
+			line-name = "HDMI_SEL2";
+			};
+
+		    line_b@2 {
+			gpio-hog;
+			gpios = <27 0>;
+			output-high;
+			line-name = "HDMI_IN_EN";
+			};
+
+		};
+	};
+};

@@ -1,0 +1,95 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-uq7_j_a75", "fsl,imx6dl-uq7_j_a75", "fsl,imx6q", "fsl,imx6dl";
+
+	fragment@0 {
+   		target = <&sound_sgtl5000>;
+        __overlay__ {
+
+            status = "disabled";
+
+		};
+	};
+
+
+	fragment@1 {
+   		target = <&codec_sgtl5000>;
+        __overlay__ {
+
+            status = "disabled";
+
+		};
+	};
+
+	
+	fragment@2 {
+   		target-path = "/";
+    	__overlay__  {
+
+			codec_ac97_standard: codec_ac97_standard {
+				compatible = "seco,ac97_standard";
+				model	   = "ac97-standard-codec";
+				status     = "okay";
+			};
+
+			sound_ac97_standard: sound_ac97_standard {
+				compatible     = "fsl,imx-ac97_standard-audio";
+				model          = "imx-ac97-ac97_standard";
+				cpu-dai        = <&ssi1>;
+				audio-codec    = <&codec_ac97_standard>;
+				ssi-controller = <&ssi1>;
+				asrc-controller = <&asrc>;
+				mux-int-port   = <1>;
+				mux-ext-port   = <6>;
+				codec-master;
+				status         = "okay";
+			};
+
+		};
+	};
+
+
+	fragment@3 {
+   		target = <&ssi1>;
+        __overlay__ {
+
+   			fsl,mode      = "ac97-slave";
+			pinctrl-names = "default", "ac97-running", "ac97-reset", "ac97-warm-reset";
+			pinctrl-0     = <&ac97link_running>;
+			pinctrl-1     = <&ac97link_running>;
+			pinctrl-2     = <&ac97link_reset>;
+			pinctrl-3     = <&ac97link_warm_reset>;
+			/* sync, sdata (output), reset */
+			ac97-gpios    = <&gpio4 19 0 &gpio4 18 0 &gpio4 23 0>;
+			//ac97-gpios    = <&gpio4 19 0 &gpio4 18 0 &gpio2 31 0>;
+			cell-index    = <0>;
+			status        = "okay";
+
+		};
+	};
+
+
+	fragment@4 {
+   		target = <&i2c3>;
+        __overlay__ {
+
+			st1232-ts@55 {
+				status	= "disabled";
+			};
+
+		};
+	};
+
+
+	fragment@5 {
+   		target = <&audmux>;
+        __overlay__ {
+
+			pinctrl-names = "";
+			pinctrl-0     = <>;
+
+		};
+	};
+};

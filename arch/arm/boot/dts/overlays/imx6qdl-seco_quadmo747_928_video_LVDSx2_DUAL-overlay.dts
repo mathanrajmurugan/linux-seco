@@ -1,0 +1,80 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-quadmo747_928", "fsl,imx6dl-quadmo747_928", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&mxcfb1>;
+        __overlay__ {
+
+            disp_dev = "ldb";
+            status   = "okay";
+
+		};
+	};
+
+
+    fragment@1 {
+   		target = <&mxcfb2>;
+        __overlay__ {
+
+            disp_dev = "ldb";
+            status   = "okay";
+
+		};
+	};
+	
+
+    fragment@2 {
+   		target = <&reg_panel_on>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@3 {
+   		target = <&pwm1>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@4 {
+   		target = <&ldb>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@5 {
+   		target = <&lvds_ch0>;
+        __overlay__ {
+
+            primary;
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@6 {
+   		target = <&lvds_ch1>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+};

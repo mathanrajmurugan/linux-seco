@@ -1,0 +1,34 @@
+
+
+/dts-v1/;
+
+#include "imx6q.dtsi"
+#include "imx6qdl-seco_SBC_A62_board.dtsi"
+#include "imx6qdl-seco_lvds_display.dtsi"
+
+
+/ {
+	model = "SECO i.MX6 Quad SBC (A62) Board";
+	compatible = "fsl,imx6q-SBC_A62", "fsl,imx6q";
+};
+
+
+
+&ldb {
+	status = "disabled";
+
+	lvds_ch0: lvds-channel@0 {
+		status = "disabled";
+		crtc   = "ipu2-di0";
+	};
+
+	lvds_ch1: lvds-channel@1 {
+		status = "disabled";
+		crtc   = "ipu2-di1";
+	};	
+};
+
+
+&sata {
+	status = "okay";
+};

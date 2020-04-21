@@ -1,0 +1,36 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-quadmo747_928", "fsl,imx6dl-quadmo747_928", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&cpld>;
+        __overlay__ {
+
+            status = "okay";
+
+		};
+	};
+
+
+    fragment@1 {
+   		target = <&lpc_bridge>;
+        __overlay__ {
+
+            status = "okay";
+
+		};
+	};
+
+	
+	fragment@2 {
+   		target = <&superio_w83627dhg>;
+        __overlay__ {
+
+            status = "okay";
+
+		};
+	};
+
+};

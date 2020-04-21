@@ -1,0 +1,27 @@
+
+
+/dts-v1/;
+
+#include "imx6dl.dtsi"
+#include "imx6qdl-seco_uQ7_962.dtsi"
+#include "imx6qdl-seco_lvds_display.dtsi"
+
+/ {
+	model = "SECO i.MX6 DualLite/Solo uQ7 (962) Board";
+	compatible = "fsl,imx6dl-uq7_962", "fsl,imx6dl";
+};
+
+
+&ldb {
+	status = "disabled";
+
+	lvds_ch0: lvds-channel@0 {
+		status = "disabled";
+		crtc   = "ipu1-di0";
+	};
+
+	lvds_ch1: lvds-channel@1 {
+		status = "disabled";
+		crtc   = "ipu1-di1";
+	};	
+};

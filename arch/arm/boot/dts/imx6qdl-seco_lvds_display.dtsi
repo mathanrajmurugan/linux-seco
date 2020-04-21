@@ -1,0 +1,149 @@
+&ldb {
+	status = "okay";
+	lvds-channel@0 {
+		reg = <0>;
+		fsl,data-mapping = "jeida";
+		fsl,data-width = <24>;
+		status = "okay";
+		primary;
+
+		display-timings {
+			native-mode = <&timing0>;
+		timing01: LDB-WVGA1 {
+				clock-frequency = <33000000>;
+				hactive = <800>;
+				vactive = <480>;
+				hback-porch = <56>;
+				hfront-porch = <50>;
+				vback-porch = <20>;
+				vfront-porch = <53>;
+				hsync-len = <180>;
+				vsync-len = <30>;
+			};
+
+			timing0: LDB-WVGA {
+				clock-frequency = <33000000>;
+				hactive = <800>;
+				vactive = <480>;
+				hback-porch = <56>;
+				hfront-porch = <50>;
+				vback-porch = <20>;
+				vfront-porch = <53>;
+				hsync-len = <180>;
+				vsync-len = <30>;
+			};
+
+			timing1: LDB-SVGA {
+				clock-frequency = <40000000>;
+				hactive = <800>;
+				vactive = <600>;
+				hback-porch = <40>;
+				hfront-porch = <60>;
+				vback-porch = <10>;
+				vfront-porch = <10>;
+				hsync-len = <20>;
+				vsync-len = <10>;
+			};
+
+			timing2: LDB-WXGA {
+				clock-frequency = <72000000>;
+				hactive = <1368>;
+				vactive = <768>;
+				hback-porch = <93>;
+				hfront-porch = <33>;
+				vback-porch = <22>;
+				vfront-porch = <7>;
+				hsync-len = <40>;
+				vsync-len = <4>;
+			};
+
+			timing3: LDB-XGA {
+				clock-frequency = <65000000>;
+				hactive = <1024>;
+				vactive = <768>;
+				hback-porch = <1230>;
+				hfront-porch = <40>;
+				vback-porch = <21>;
+				vfront-porch = <7>;
+				hsync-len = <60>;
+				vsync-len = <10>;
+			};
+
+			timing4: LDB-SXGA {
+				clock-frequency = <54000000>;
+				hactive = <1280>;
+				vactive = <1024>;
+				hback-porch = <220>;
+				hfront-porch = <40>;
+				vback-porch = <21>;
+				vfront-porch = <7>;
+				hsync-len = <60>;
+				vsync-len = <10>;
+			};
+
+
+			timing5: LDB-1050P60 {
+				clock-frequency = <0x68e7780>;
+				hactive = <0x690>;
+				vactive = <0x41a>;
+				hback-porch = <0x28>;
+				hfront-porch = <0x50>;
+				vback-porch = <0xf>;
+				vfront-porch = <0xf>;
+				hsync-len = <0x28>;
+				vsync-len = <0x5>;
+			};
+
+			timing6: LDB-1080P60 {
+				clock-frequency = <141200000>;
+				hactive = <1920>;
+				vactive = <1080>;
+				hback-porch = <88>;
+				hfront-porch = <58>;
+				vback-porch = <14>;
+				vfront-porch = <8>;
+				hsync-len = <42>;
+				vsync-len = <14>;
+			};
+	
+			timing7: LDB-1280P60 {
+			        clock-frequency = <66100000>;
+			        hactive = <1280>;
+			        vactive = <800>;
+			        hback-porch = <35>;
+			        hfront-porch = <35>;
+			        vback-porch = <4>;
+			        vfront-porch = <4>;
+			        hsync-len = <10>;
+			        vsync-len = <2>;
+			};
+
+		};
+	};
+
+	lvds-channel@1 {
+		reg = <1>;
+		fsl,data-mapping = "jeida";
+		fsl,data-width = <24>;
+		status = "disabled";
+
+		crtc = "ipu2-di1";
+		display-timings {
+			native-mode = <&timing8>;
+
+			timing8: seco_lvds1 {
+				clock-frequency = <38000000>;
+				hactive = <800>;
+				vactive = <480>;
+				hback-porch = <56>;
+				hfront-porch = <50>;
+				vback-porch = <20>;
+				vfront-porch = <23>;
+				hsync-len = <150>;
+				vsync-len = <60>;
+			};
+		};
+	};
+
+};
+

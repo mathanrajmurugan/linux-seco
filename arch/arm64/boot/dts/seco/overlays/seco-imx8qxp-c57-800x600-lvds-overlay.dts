@@ -1,0 +1,111 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * HDMI only dts, disable ldb display.
+ */
+
+/dts-v1/;
+/plugin/;
+
+
+/ {
+    compatible = "fsl,imx8qxp-mek","seco,imx8qxp-c57","fsl,imx8qxp";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                      LVDS 800X600 (SINGLE CHANNEL)                       |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@0 {
+                target = <&mux_sel>;
+                __overlay__ {
+                                compatible = "regulator-fixed";
+                                regulator-name = "MUX_SEL";
+                                regulator-min-microvolt = <3300000>;
+                                regulator-max-microvolt = <3300000>;
+                                gpio = <&gpio3 22 0>;
+                                enable-active-down;
+                                regulator-always-on;
+                };
+        };
+
+	fragment@1 {
+                target = <&ldb1_phy>;
+                __overlay__ {
+                        status = "okay";
+                        en_custom_bpp_cfg;
+                        16bpp_bit16_cfg3;
+                };
+        };
+
+	fragment@2 {
+                target = <&ldb1>;
+                __overlay__ {
+                status = "okay";
+                #address-cells = <1>;
+		#size-cells = <0>;
+                
+                        
+
+                lvds-channel@1 {
+                    reg = <1>;
+                    status = "disabled";
+                    };
+
+
+                lvds0: lvds-channel@0 {
+                    fsl,data-mapping = "jeida";
+                    fsl,data-width = <24>;
+                    status = "okay";
+
+                    display-timings {
+                        native-mode = <&lvds0_timing0>;
+
+                        lvds0_timing0: 800x600 {
+                            clock-frequency = <39000000>;
+                            hactive = <800>;
+                            vactive = <600>;
+                            hback-porch = <220>;
+                            hsync-len = <60>;
+                            hfront-porch = <40>;
+                            vback-porch = <21>;
+                            vsync-len = <10>;
+                            vfront-porch = <7>;
+                            hsync-active = <0>;
+                            vsync-active = <0>;
+                            de-active = <1>;
+                            pixelclk-active = <1>;
+                        };
+                    };
+                };
+            };
+        };
+
+	fragment@3 {
+                target = <&ldb2_phy>;
+                __overlay__ {
+                        status = "disabled"; 
+                };
+        };
+    
+    fragment@4 {
+                target = <&ldb2>;
+                __overlay__ {
+                        status = "disabled"; 
+                };
+        };
+
+};

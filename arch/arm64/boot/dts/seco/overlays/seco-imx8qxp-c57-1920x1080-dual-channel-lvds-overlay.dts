@@ -1,0 +1,107 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * HDMI only dts, disable ldb display.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "fsl,imx8qxp-mek","seco,imx8qxp-c57","fsl,imx8qxp";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                      LVDS 1920x1080 (DUAL CHANNEL)                       |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@0 {
+                target = <&mux_sel>;
+                __overlay__ {
+				compatible = "regulator-fixed";
+                regulator-name = "MUX_SEL";
+                regulator-min-microvolt = <3300000>;
+                regulator-max-microvolt = <3300000>;
+                gpio = <&gpio3 22 0>;
+                enable-active-down;
+                regulator-always-on;
+                };
+        };
+
+	fragment@1 {
+                target = <&ldb1_phy>;
+                __overlay__ {
+                        status = "okay";
+                };
+        };
+
+	fragment@2 {
+                target = <&ldb1>;
+                __overlay__ {
+                #address-cells = <1>;
+		#size-cells = <0>;
+                status = "okay";
+                fsl,dual-channel;
+                power-domains = <&pd_mipi_dsi_0_dual_lvds>;
+                gpios = <&gpio3 22 0>;
+                
+
+                lvds-channel@1 {
+                    reg = <1>;
+                    status = "disabled";
+                    };
+
+
+                lvds0: lvds-channel@0 {
+                    fsl,data-mapping = "spwg";
+                    fsl,data-width = <24>;
+                    status = "okay";
+
+                    display-timings {
+                        native-mode = <&lvds0_timing>;
+
+                        lvds0_timing: 1920x1080 {
+                            /* 1920x1080p24 */
+                            clock-frequency = <148500000>;
+                            hactive = <1920>;
+                            vactive = <1080>;
+                            hsync-len = <0 44 60>;
+                            hfront-porch = <80 88 95>;
+                            hback-porch = <100 148 160>;
+                            vfront-porch = <0 4 6>;
+                            vback-porch = <0 36 50>;
+                            vsync-len = <0 5 6>;
+                        };
+                    };
+                };
+            };
+        };
+
+	fragment@3 {
+                target = <&ldb2_phy>;
+                __overlay__ {
+                        status = "okay"; 
+                };
+        };
+
+	fragment@4 {
+                target = <&ldb2>;
+                __overlay__ {
+                status = "disabled";
+            };
+        };
+
+};

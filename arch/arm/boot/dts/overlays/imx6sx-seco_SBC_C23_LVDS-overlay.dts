@@ -1,0 +1,74 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6sx-seco_SBC_C23", "fsl,imx6sx";
+
+    	fragment0 {
+        target = <&ldb>;
+        __overlay__ {
+            
+			status = "okay";
+			
+        };
+    };
+
+
+    	fragment1 {
+        target = <&lvds_chn1>;
+        __overlay__ {
+            
+			status = "okay";
+			
+        };
+    };
+
+
+	fragment2 {
+        target = <&reg_ldb_panel_on>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+
+	fragmen3 {
+        target = <&dcic2>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+
+	fragment4 {
+        target = <&blk_lcdif2>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+	fragment5 {
+        target = <&lcdif2>;
+        __overlay__ {
+            
+			status = "okay";
+			
+        };
+    };
+
+	fragment6 {
+        target = <&st1232>;
+        __overlay__ {
+            
+			status = "okay";
+			
+        };
+    };
+
+};

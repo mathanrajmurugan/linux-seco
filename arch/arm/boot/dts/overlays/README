@@ -1,0 +1,19 @@
+
+Overlay for Display setting:
+In order to be compatible with the tool at u-boot, the name of the of the dtbo file must agree the follow rule:
+
+imx6<type>-seco_<board_name>_video_<configuration>.dtbo
+
+where:
+
+type: [qdl | sx]
+board_name: [uq7_962 | uQ7_J_A75 | quadmo747_928 | SBC_A62 | SBC_B08]
+configuration:
+	- LVDS : for single LVDS display
+	- HDMI : for HDMI display only
+	- LVDSx2_CLONE : two LVDS displays with same fb
+	- LVDSx2_DUAL : two indipendent LVDS displays
+	- LVDS_HDMI : LVDS and HDMI together with LVDS display as primary
+	- HDMI_LVDS : LVDS and HDMI together with HDMI display as primary
+
+

@@ -1,0 +1,24 @@
+/*
+* Author: Stefano Viola <stefano.viola@seco.com>
+* Author: Mathanraj Murugan <mathan.raj@seco.com>
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License version 2 as
+* published by the Free Software Foundation.
+*
+*
+*/
+
+/dts-v1/;
+
+#include "imx6sx-seco_SBC_C23.dtsi" 
+
+/ {
+        model = "SECO SBC C23 BASIC (based on iMX.6 SoloX)";
+        compatible = "fsl,imx6sx-seco_SBC_C23", "fsl,imx6sx-sdb", "fsl,imx6sx";
+};
+
+&fec2 {
+	status = "disabled";
+};
+

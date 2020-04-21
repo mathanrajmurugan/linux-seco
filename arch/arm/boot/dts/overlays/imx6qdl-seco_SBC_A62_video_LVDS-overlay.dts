@@ -1,0 +1,57 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-SBC_A62", "fsl,imx6dl-SBC_A62", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&mxcfb1>;
+        __overlay__ {
+
+            disp_dev = "ldb";
+            status   = "okay";
+
+		};
+	};
+	
+
+    fragment@1 {
+   		target = <&reg_panel_on>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@2 {
+   		target = <&pwm1>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@3 {
+   		target = <&ldb>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@4 {
+   		target = <&lvds_ch0>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+};

@@ -1,0 +1,26 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-uq7_j_a75", "fsl,imx6dl-uq7_j_a75", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&uart1>;
+        __overlay__ {
+
+            status = "okay";
+
+		};
+	};
+
+	
+	fragment@1 {
+   		target = <&can1>;
+        __overlay__ {
+
+            status = "disabled";
+
+		};
+	};
+
+};

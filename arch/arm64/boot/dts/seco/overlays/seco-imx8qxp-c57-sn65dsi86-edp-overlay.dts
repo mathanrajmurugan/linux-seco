@@ -1,0 +1,88 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * HDMI only dts, disable ldb display.
+ */
+
+/dts-v1/;
+/plugin/;
+
+
+/ {
+    compatible = "fsl,imx8qxp-mek","seco,imx8qxp-c57","fsl,imx8qxp";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                      LVDS 1920x1080 (DUAL CHANNEL)                       |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@0 {
+                target = <&mux_sel>;
+                __overlay__ {
+				compatible = "regulator-fixed";
+                regulator-name = "MUX_SEL";
+                regulator-min-microvolt = <3300000>;
+                regulator-max-microvolt = <3300000>;
+                gpio = <&gpio3 22 1>;
+                enable-active-high;
+                regulator-always-on;
+                };
+        };
+
+	fragment@1 {
+                target = <&panel>;
+                __overlay__ {
+                status = "okay";
+                };
+                
+
+        };
+
+	fragment@2 {
+                target = <&i2c0_mipi_lvds0>;
+                __overlay__ {
+                status = "okay";
+
+                edp_bridge: sn65dsi86@2c {
+                    status = "okay";
+
+                };
+            };
+        };
+
+	fragment@3 {
+                target = <&mipi_dsi_phy1>;
+                __overlay__ {
+                        status = "okay"; 
+                };
+        };
+
+	fragment@4 {
+                target = <&mipi_dsi1>;
+                __overlay__ {
+                pwr-delay = <10>;
+	            status = "okay";
+            };
+        };
+
+    fragment@5 {
+                target = <&mipi_dsi_bridge1>;
+                __overlay__ {
+                status = "okay";
+            };
+        };
+
+};

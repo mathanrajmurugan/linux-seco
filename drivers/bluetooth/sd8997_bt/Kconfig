@@ -1,0 +1,10 @@
+
+config SD8997_BT_DEBUG
+	depends on SD8997_BT
+	bool "Debug option"
+	default n
+	help
+          DEBUG LEVEL n/1/2:
+          n: NO DEBUG
+          1: Only PRINTM(MMSG,...), PRINTM(MFATAL,...), ...
+	  2: All PRINTM()

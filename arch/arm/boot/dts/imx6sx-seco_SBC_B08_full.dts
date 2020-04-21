@@ -1,0 +1,43 @@
+/dts-v1/;
+
+#include "imx6sx-seco_SBC_B08_board.dtsi"
+
+
+/ {
+	model = "SECO i.MX6 Solo X SBC (B08) Board";
+	compatible = "fsl,imx6sx-SBC_B08", "fsl,imx6sx";
+};
+
+
+/*  WiFi  */
+&usdhc3 {
+	status = "okay";
+};
+
+
+&kim {
+	status = "okay";
+};
+
+
+&btwilink {
+	status = "okay";
+};
+
+
+/*  eMMC  */
+&usdhc4 {
+	status = "okay";
+};
+
+
+&qspi2 {
+	status = "okay";
+};
+
+
+&fec2 {
+	status = "okay";
+};
+
+

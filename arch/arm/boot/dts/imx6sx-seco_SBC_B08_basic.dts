@@ -1,0 +1,9 @@
+/dts-v1/;
+
+#include "imx6sx-seco_SBC_B08_board.dtsi"
+
+
+/ {
+	model = "SECO i.MX6 Solo X SBC (B08) Board";
+	compatible = "fsl,imx6sx-SBC_B08", "fsl,imx6sx";
+};

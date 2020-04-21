@@ -1,0 +1,112 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6q-quadmo747_928", "fsl,imx6dl-quadmo747_928", "fsl,imx6q", "fsl,imx6dl";
+
+    fragment@0 {
+   		target = <&mxcfb1>;
+        __overlay__ {
+
+            disp_dev = "ldb";
+            status   = "okay";
+
+		};
+	};
+
+
+    fragment@1 {
+   		target = <&mxcfb2>;
+        __overlay__ {
+
+            disp_dev    = "hdmi";
+            status      = "okay";
+            mode_str    = "1920x1080M@60";
+		    default_bpp = <24>;
+		    int_clk     = <0>;
+		    late_init   = <0>;
+
+		};
+	};
+	
+
+    fragment@2 {
+   		target = <&reg_panel_on>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@3 {
+   		target = <&pwm1>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@4 {
+   		target = <&ldb>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@5 {
+   		target = <&lvds_ch0>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@6 {
+   		target = <&hdmi_edid>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@7 {
+   		target = <&hdmi_audio>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+
+    fragment@8 {
+   		target = <&hdmi_core>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+	
+
+    fragment@9 {
+   		target = <&hdmi_video>;
+        __overlay__ {
+
+            status      = "okay";
+
+		};
+	};
+
+};

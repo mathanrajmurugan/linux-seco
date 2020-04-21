@@ -1,0 +1,86 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * LVDS1  - enable ldb1 display.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/imx8qm-clock.h>
+
+/ {
+        compatible = "fsl,imx8qm-mek","fsl,seco-imx8qm-c26", "fsl,imx8qm";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               LVDS1 OVERLAY                              |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@0 {
+                target = <&ldb1_phy>;
+                __overlay__ {
+			status = "okay";
+        	};
+        };
+
+	fragment@1 {
+                target = <&ldb1>;
+                __overlay__ {
+                        status = "okay";
+
+			lvds-channel@1 {
+				fsl,data-mapping = "spwg";
+				fsl,data-width = <18>;
+				status = "okay";
+				display-timings {
+					native-mode = <&timing0>;
+			                timing0: 800x480p18 {
+						/* 800x480p18 */
+						clock-frequency = <33000000>;
+						hactive = <800>;
+						vactive = <480>;
+						hsync-len = <40 180 190>;
+						hfront-porch = <20 50 35>;
+						hback-porch = <50 56 70>;
+						vfront-porch = <0 53 60>;
+						vback-porch = <10 20 30>;
+						vsync-len = <10 30 40>;
+					};
+				};	
+		    	};
+		    
+			lvds-channel@0 {
+				status = "disabled";
+			};
+                };
+        };
+
+	fragment@2 {
+                target = <&i2c0_lvds0>;
+                __overlay__ {
+			status = "okay";
+                };
+        };
+
+	fragment@3 {
+                target = <&i2c1_lvds0>;
+                __overlay__ {
+                        status = "okay"; 
+                };
+        };
+		
+};

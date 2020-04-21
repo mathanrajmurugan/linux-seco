@@ -1,0 +1,67 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx6sx-SBC_B08", "fsl,imx6sx";
+
+    
+    fragment0 {
+        target = <&pwm6>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+
+	fragment1 {
+        target = <&lcdif1>;
+        __overlay__ {
+            
+			status = "okay";
+			
+        };
+    };
+
+
+	fragment2 {
+        target = <&gt911>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+    
+    fragment3 {
+        target = <&reg_lcd_panel_on>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+
+    fragment4 {
+        target = <&reg_lcd_bl_on>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+
+    fragment5 {
+        target = <&dcic1>;
+        __overlay__ {
+            
+			status = "okay";
+
+        };
+    };
+
+};
