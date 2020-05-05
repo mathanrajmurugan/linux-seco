@@ -293,6 +293,17 @@ config SND_SOC_SECO_SGTL5000
 	  Enable I2S based access to the SGTL5000 codec attached
 	  to the SAI interface
 
+config SND_SOC_SECO_MAX98357A
+	tristate "Seco MAX98357A"
+	depends on OF 
+	select SND_SOC_MAX98357A
+	select SND_SIMPLE_CARD
+	select SND_SOC_FSL_SAI
+	select SND_SOC_IMX_PCM_DMA
+	help
+	  Enable I2S based access to the MAX98357A codec attached
+	  to the i.MX8M SAI interface
+
 config SND_SOC_PHYCORE_AC97
 	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
 	depends on MACH_PCM043 || MACH_PCA100

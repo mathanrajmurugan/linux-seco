@@ -245,4 +245,38 @@ CDN_API_STATUS CDN_API_General_Phy_Test_Access_blocking(state_struct *state,
 CDN_API_STATUS CDN_API_General_GetHpdState(state_struct *state, u8 *hpd_state);
 
 CDN_API_STATUS CDN_API_General_GetHpdState_blocking(state_struct *state, u8 *hpd_state);
+
+/**
+ * Read Trace messages.
+ * @param buf Buffer to store trace data. It must fit at least req_count
+ * bytes.
+ * @param req_count Number of trace data bytes to read.
+ * @param rd_count [out] Number of trace data actually read.
+ * @return status
+ */
+CDN_API_STATUS CDN_API_General_GetTrace(state_struct *state,
+	u8 *buf, u16 req_count, u16 *rd_count);
+/**
+ * \breif blocking version of #CDN_API_General_GetTrace
+ */
+CDN_API_STATUS CDN_API_General_GetTrace_blocking(state_struct *state,
+	u8 *buf, u16 req_count, u16 *rd_count);
+
+/**
+ * Asserts PHY reset.
+ */
+CDN_API_STATUS CDN_API_General_AssertPhyReset(state_struct *state);
+/**
+ * \breif blocking version of #CDN_API_General_AssertPhyReset
+ */
+CDN_API_STATUS CDN_API_General_AssertPhyReset_blocking(state_struct *state);
+
+/**
+ * De-asserts PHY reset.
+ */
+CDN_API_STATUS CDN_API_General_DeassertPhyReset(state_struct *state);
+/**
+ * \breif blocking version of #CDN_API_General_DeassertPhyReset
+ */
+CDN_API_STATUS CDN_API_General_DeassertPhyReset_blocking(state_struct *state);
 #endif

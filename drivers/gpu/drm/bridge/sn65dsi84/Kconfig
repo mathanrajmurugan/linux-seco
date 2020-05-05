@@ -1,0 +1,7 @@
+config DRM_I2C_SN65DSI84
+	tristate "sn65dsi84 bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select REGMAP_I2C
+	help
+	  Support for the TI SN65DSI84 LVDS Bridge.

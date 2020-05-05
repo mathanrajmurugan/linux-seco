@@ -1061,7 +1061,7 @@ static int setBootDev (struct econtroller *ectrl, int boot_idx, enum BOOTDEV_ID 
                                 ectrl_read_data ((client), WDT_CONFIG_REG) & ~WDT_MASK_ENABLE : \
                                 ectrl_read_data ((client), WDT_CONFIG_REG) | WDT_MASK_ENABLE) ; WDTcmdenable(client); };
 */
-#define WDTsetEnableReg(client, en)	WDTcmdenable(client)
+#define WDTsetEnableReg(client, en)	( en == 1) ? WDTcmdenable(client) : WDTcmddisable(client)
 
 #define WDTgetEventReg(client)     (ectrl_read_data ((client), WDT_CONFIG_REG) & \
 					WDT_MASK_EVENT) >> WDT_SHIFT_EVENT
@@ -1107,6 +1107,7 @@ static int setBootDev (struct econtroller *ectrl, int boot_idx, enum BOOTDEV_ID 
 
 #define WDTrefresh(client)         		ectrl_write_data ((client), CMD_WD_WDI, 1)
 #define WDTcmdenable(client)                    ectrl_write_data ((client), CMD_WD_EN, 1)
+#define WDTcmddisable(client)                    ectrl_write_data ((client), CMD_WD_DIS, 1)
 
 
 static inline enum wdt_event WDTgetEvent (struct i2c_client *client) {
@@ -1843,9 +1844,9 @@ static ssize_t ectrl_proc_wdt_enable_write (struct file *file, const char __user
 	if (err_conv == 0) {
 		if (en == 0 || en == 1) {
 			mutex_lock (&ectrl->fs_lock);
-			WDTsetEnableReg (ectrl->client, en);
-			mutex_unlock (&ectrl->fs_lock);
-		} else 
+                        WDTsetEnableReg (ectrl->client, en);
+                        mutex_unlock (&ectrl->fs_lock);
+		} else
 			return -EINVAL;
 	}
 	return count;

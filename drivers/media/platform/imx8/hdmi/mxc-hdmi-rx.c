@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 #include <linux/irq.h>
+
 #include "mxc-hdmi-rx.h"
 #include "API_AFE_ss28fdsoi_hdmirx.h"
 
@@ -28,7 +29,15 @@
 
 #define imx_sd_to_hdmi(sd) container_of(sd, struct mxc_hdmi_rx_dev, sd)
 
+#define CHECK_AVI_ERROR_COUNTERS 0
+
+#ifdef CONFIG_IMX_HDP_CEC
 static void mxc_hdmi_cec_init(struct mxc_hdmi_rx_dev *hdmi_rx);
+#endif
+
+#define KEEP_CEC_ENABLED 0x40
+
+#define ktime_timeout_ms(ms_) ktime_add(ktime_get(), ms_to_ktime(ms_))
 
 static const struct v4l2_dv_timings_cap mxc_hdmi_timings_cap = {
 	.type = V4L2_DV_BT_656_1120,
@@ -719,27 +728,347 @@ int mxc_hdmi_init(struct mxc_hdmi_rx_dev *hdmi_rx)
 		return -EINVAL;
 	}
 
+	hdmi_rx->tmdsmon_th = NULL;
+	hdmi_rx->tmdsmon_state = 0;
 
 	return 0;
 }
 
+static void dump_debug_regs(state_struct *state)
+{
+	u16 dbgp = 0xFFFF;
+	u16 dbg;
+	u32 reg;
+
+	pr_info("Checking debug registers...\n");
+	do {
+		cdn_apb_read(state, ADDR_APB_CFG + (SW_DEBUG_L << 2), &reg);
+		dbg = (u8)reg;
+		cdn_apb_read(state, ADDR_APB_CFG + (SW_DEBUG_H << 2), &reg);
+		dbg |= (u8)reg << 8;
+
+		if (dbgp != dbg) {
+			u32 addr;
+			u32 r1, r2, r3, r4;
+
+			pr_info("=== DBG: 0x%.4X\n", dbgp = dbg);
+
+			cdn_apb_read(state, ADDR_APB_CFG +
+				     (VER_LIB_L_ADDR << 2), &r1);
+			cdn_apb_read(state, ADDR_APB_CFG +
+				     (VER_LIB_H_ADDR << 2), &r2);
+			cdn_apb_read(state, ADDR_APB_CFG +
+				     (VER_L << 2), &r3);
+			cdn_apb_read(state, ADDR_APB_CFG +
+				     (VER_H << 2), &r4);
+
+			addr = r1 << 24 | r2 << 16 | r3 << 8 | r4;
+
+			pr_info("=== DBG: addr 0x%.8X\n", addr);
+		}
+	} while (1);
+}
+
+static void alive(state_struct *state)
+{
+	u32 ret;
+
+	/* Check if FW is still alive */
+	ret = CDN_API_CheckAlive_blocking(state);
+	if (ret) {
+		pr_err("NO HDMI RX FW running\n");
+		pr_err("Checking debug registers...\n");
+		dump_debug_regs(state);
+		/* BUG(); */
+	}
+}
+
+int tmdsmon_fn(void *data)
+{
+	struct mxc_hdmi_rx_dev *hdmi_rx = (struct mxc_hdmi_rx_dev *)data;
+	state_struct *state = &hdmi_rx->state;
+	int tmds;
+	u8 startup_attempts;
+	u8 avi_fail_cnt;
+	u8 tmds_measure_cnt;
+
+	pr_info("= starting tmdsmon thread\n");
+	
+	startup_attempts = 0;
+	avi_fail_cnt = 0;
+	tmds_measure_cnt = 0;
+	
+	while (1) {
+		bool change = false;
+		u8 sts;
+
+		cpu_relax();
+		msleep(200);
+
+		if (hdmi_rx->tmdsmon_state != 1) {
+			if (hdmi_rx->tmdsmon_state == 2)
+				pr_info("= stopping tmdsmon thread\n");
+			hdmi_rx->tmdsmon_state = 0;
+			startup_attempts = 0;
+			avi_fail_cnt = 0;
+			continue;
+		}
+
+
+		alive(state);
+		
+		tmds = -1;
+		if (pma_rx_clk_signal_detect(state) == 0)
+			tmds = hdmirx_get_stable_tmds(state);
+		
+		if (tmds < 0) {
+			if (hdmi_rx->initialized) {
+				pr_info("\nLost TMDS clock\n\n");
+				hdmirx_phy_pix_engine_reset(&hdmi_rx->state);
+				hdmirx_stop(&hdmi_rx->state);
+				hdmirx_hdcp_disable(&hdmi_rx->state);
+				hdmi_rx->cable_plugin = false;
+				hdmi_rx->initialized = false;
+			}
+			hdmi_rx->tmds_clk = -1;
+			startup_attempts = 0;
+			avi_fail_cnt = 0;
+			tmds_measure_cnt = 0;
+			continue;
+		}
+		
+		tmds_measure_cnt++;
+		if (tmds_measure_cnt == 100) {
+			tmds_measure_cnt = 0;
+			pr_info("\nMeasured TMDS is %d\n\n",tmds);
+		}
+		
+		if (tmds > (hdmi_rx->tmds_clk + 50) ||
+		    tmds < (hdmi_rx->tmds_clk - 50)) {
+			pr_info("\nTMDS change detect: %d -> %d\n\n",
+				hdmi_rx->tmds_clk, tmds);
+			change = true;
+		} else if ((tmds > 0) && (hdmi_rx->initialized)) {
+			int avi_change = get_avi_infoframe(state);
+			
+			hdmi_rx->tmds_clk = tmds;
+				
+			if (avi_change == 1) {
+				pr_info("\nAVI change detect\n\n");
+				change = true;
+			} else if (avi_change < 0) {
+				GENERAL_Read_Register_response resp;
+
+				CDN_API_General_Read_Register_blocking(
+					state,
+					ADDR_SINK_MHL_HD + (TMDS_DEC_ST << 2),
+					&resp);
+				if ((resp.val & 1) == 0) {
+					pr_info("\nFailed to get AVI infoframe\n\n");
+					if (avi_fail_cnt > 0) {
+						uint32_t events;
+						avi_fail_cnt = 0;
+						/* Don't care about this initial status read, just clearing it out first 
+						   before triggering HPD...
+						*/
+						cdn_apb_read(&hdmi_rx->state,SW_EVENTS1<<2,&events);
+						hdmirx_hotplug_trigger(&hdmi_rx->state);
+						hdmirx_wait_edid_read(&hdmi_rx->state);
+						change = true;
+					} else
+						avi_fail_cnt++;
+				}
+			} else {
+				avi_fail_cnt = 0;
+			}
+
+		}
+		
+		/* Check in case about to shut down... */
+		if (hdmi_rx->tmdsmon_state != 1)
+			continue;
+		
+		if (change) {
+			if (hdmi_rx->initialized) {
+				hdmirx_phy_pix_engine_reset(&hdmi_rx->state);
+				hdmirx_stop(&hdmi_rx->state);
+				hdmi_rx->initialized = false;
+				hdmirx_hdcp_disable(&hdmi_rx->state);
+			}
+			hdmi_rx->cable_plugin = false;
+
+			if (hdmi_rx->cec_running) {
+				CDN_API_MainControl_blocking(&hdmi_rx->state,
+							     0 | KEEP_CEC_ENABLED,
+							     &sts);
+				pr_info("%s(): called CDN_API_MainControl_blocking(0) with KEEP_CEC_ENABLED\n",
+				       __func__);
+			}
+
+			CDN_API_MainControl_blocking(&hdmi_rx->state, 1, &sts);
+			pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
+				__func__);
+			
+			/* Initial trigger if we are not up either due to error or the source going away */
+/*			if (hdmi_rx->tmds_clk < 0)
+				hdmirx_hotplug_trigger(&hdmi_rx->state);
+*/			
+			pr_info("= TMDS Mon calling hdmirx_startup after seeing TMDS of %d\n",tmds);
+			if (hdmirx_startup(&hdmi_rx->state) < 0) {
+				hdmi_rx->tmds_clk = -1;
+				if (startup_attempts > 1) {
+					pr_info("= TMDS Mon applying HPD trigger due to %d failed startup attempts\n",startup_attempts);
+					hdmirx_hotplug_trigger(&hdmi_rx->state);
+					hdmirx_wait_edid_read(&hdmi_rx->state);
+					startup_attempts = 0;
+				} else
+					startup_attempts++;
+				continue;
+			}
+			show_trace(state,1);
+			show_trace(state,1);
+			pr_info("= TMDS Mon cleared trace logs\n");
+			hdmirx_hdcp_enable(&hdmi_rx->state);
+			startup_attempts = 0;
+			hdmi_rx->initialized = true;
+			hdmi_rx->cable_plugin = true;
+		} else {
+			if (hdmi_rx->initialized) {
+				CDN_API_HDCPRX_Status hdcp_status;
+
+				hdmirx_hdcp_get_status(&hdmi_rx->state,
+						       &hdcp_status);
+			}
+			startup_attempts = 0;
+		}
+
+		if ((tmds > 0) && (hdmi_rx->initialized))
+			show_trace(state,0);
+		
+	}
+
+	pr_info("= exiting tmdsmon thread\n");
+
+	/* Avoid compiler warning */
+	return 0;
+}
+
+static int tmdsmon_init(struct mxc_hdmi_rx_dev *hdmi_rx)
+{
+	static const char name[] = "tmdsmon_th";
+
+	if (hdmi_rx->tmdsmon_th) {
+		pr_info("Resuming thread for monitoring TMDS changes\n");
+		hdmi_rx->tmdsmon_state = 1;
+		return 0;
+	}
+
+	pr_info("Creating thread for monitoring TMDS changes\n");
+
+	hdmi_rx->tmdsmon_th = kthread_create(tmdsmon_fn, hdmi_rx, name);
+	if (!IS_ERR(hdmi_rx->tmdsmon_th)) {
+		hdmi_rx->tmdsmon_state = 1;
+		wake_up_process(hdmi_rx->tmdsmon_th);
+	} else {
+		dev_err(&hdmi_rx->pdev->dev,
+			"Failed to spawn TMDS monitor thread\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static void tmdsmon_cleanup(struct mxc_hdmi_rx_dev *hdmi_rx)
+{
+	pr_info("= stopping tmds mon\n");
+	hdmi_rx->tmdsmon_state = 2;
+	while (hdmi_rx->tmdsmon_state == 2)
+		schedule();
+	pr_info("= stopped tmds mon\n");
+}
+
+int hdmirx_wait_edid_read(state_struct *state)
+{
+	uint32_t events;
+
+	time_t timeout = ktime_timeout_ms(2000);
+	pr_info("hdmirx_wait_edid_read wait for EDID to be read\n");
+	do {
+		cdn_apb_read(state,SW_EVENTS1<<2,&events);
+		if (ktime_after(ktime_get(), timeout))
+			goto timeout_err;
+	} while ((events & 0x1) == 0);
+	pr_info("hdmirx_wait_edid_read detected, now wait for status to be 0");
+	
+	timeout = ktime_timeout_ms(500);
+	do {
+		msleep(50);
+		cdn_apb_read(state,SW_EVENTS1<<2,&events);
+		if (ktime_after(ktime_get(), timeout))
+			goto timeout_err;
+	} while ((events & 0x1) == 1);
+	
+	pr_info("hdmirx_wait_edid_read Finished successfully, final status 0x%08X\n",events);
+	return 0;
+
+timeout_err:
+	pr_info("hdmirx_wait_edid_read timed out waiting for EDID to be read\n");
+	return -1;
+
+}
+
+
 static void hpd5v_work_func(struct work_struct *work)
 {
-	struct mxc_hdmi_rx_dev *hdmi_rx = container_of(work, struct mxc_hdmi_rx_dev,
-								hpd5v_work.work);
+	struct mxc_hdmi_rx_dev *hdmi_rx = container_of(work,
+						       struct mxc_hdmi_rx_dev,
+						       hpd5v_work.work);
 	char event_string[32];
 	char *envp[] = { event_string, NULL };
 	u8 sts;
-	u8 hpd;
+	u8 hpd = ~0;
+
+	pr_info("%s hello\n", __func__);
 
 	/* Check cable states before enable irq */
 	hdmirx_get_hpd_state(&hdmi_rx->state, &hpd);
 	if (hpd == 1) {
+		//uint32_t events;
 		pr_info("HDMI RX Cable Plug In\n");
 
+		CDN_API_MainControl_blocking(&hdmi_rx->state, 0, &sts);
+		pr_info("%s(): called CDN_API_MainControl_blocking(0)\n",
+			__func__);
+		imx8qm_hdmi_phy_reset(&hdmi_rx->state, 0);
+		CDN_API_General_AssertPhyReset_blocking(&hdmi_rx->state);
+		
 		CDN_API_MainControl_blocking(&hdmi_rx->state, 1, &sts);
+		pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
+			__func__);
+		
+		CDN_API_General_DeassertPhyReset_blocking(&hdmi_rx->state);
+		
+		/* Don't care about this initial status read, just clearing it out first 
+		   before triggering HPD...
+		*/
+/*
+		cdn_apb_read(&hdmi_rx->state,SW_EVENTS1<<2,&events);
 		hdmirx_hotplug_trigger(&hdmi_rx->state);
-		hdmirx_startup(&hdmi_rx->state);
+		hdmirx_wait_edid_read(&hdmi_rx->state);
+*/		
+		pr_info("hpd5v_work_func calling hdmirx_startup\n");
+		if (hdmirx_startup(&hdmi_rx->state) == 0) {
+			hdmi_rx->initialized = 1;
+			show_trace(&hdmi_rx->state,1);
+			show_trace(&hdmi_rx->state,1);
+			pr_info("Cleared trace logs\n");
+		} else {
+			hdmirx_hotplug_trigger(&hdmi_rx->state);
+			hdmirx_wait_edid_read(&hdmi_rx->state);
+			hdmi_rx->initialized = 0;
+			hdmi_rx->tmds_clk = -1;
+		}
+
 		enable_irq(hdmi_rx->irq[HPD5V_IRQ_OUT]);
 		sprintf(event_string, "EVENT=hdmirxin");
 		kobject_uevent_env(&hdmi_rx->pdev->dev.kobj, KOBJ_CHANGE, envp);
@@ -751,21 +1080,34 @@ static void hpd5v_work_func(struct work_struct *work)
 			hdmi_rx->cec_running = true;
 		}
 #endif
+		tmdsmon_init(hdmi_rx);
 	} else if (hpd == 0){
-		pr_info("HDMI RX Cable Plug Out\n");
-		hdmirx_stop(&hdmi_rx->state);
+		tmdsmon_cleanup(hdmi_rx);
+		CDN_API_HDMIRX_SetHpd_blocking(&hdmi_rx->state, 0);
+		if (hdmi_rx->initialized) {
+			/* Clear HPD */
+			hdmirx_phy_pix_engine_reset(&hdmi_rx->state);
+			hdmirx_stop(&hdmi_rx->state);
+			hdmi_rx->initialized = false;
+		}
 #ifdef CONFIG_IMX_HDP_CEC
 		if (hdmi_rx->is_cec && hdmi_rx->cec_running) {
 			imx_cec_unregister(&hdmi_rx->cec);
 			hdmi_rx->cec_running = false;
 		}
 #endif
-		hdmirx_phy_pix_engine_reset(&hdmi_rx->state);
 		sprintf(event_string, "EVENT=hdmirxout");
 		kobject_uevent_env(&hdmi_rx->pdev->dev.kobj, KOBJ_CHANGE, envp);
 		enable_irq(hdmi_rx->irq[HPD5V_IRQ_IN]);
-		CDN_API_MainControl_blocking(&hdmi_rx->state, 0, &sts);
 		hdmi_rx->cable_plugin = false;
+
+		hdmirx_hdcp_disable(&hdmi_rx->state);
+		CDN_API_MainControl_blocking(&hdmi_rx->state, 0, &sts);
+		pr_info("%s(): called CDN_API_MainControl_blocking(0)\n",
+			__func__);
+		imx8qm_hdmi_phy_reset(&hdmi_rx->state, 0);
+		CDN_API_General_AssertPhyReset_blocking(&hdmi_rx->state);
+
 	} else
 		pr_warn("HDMI RX Cable State unknow\n");
 
@@ -775,6 +1117,8 @@ static void hpd5v_work_func(struct work_struct *work)
 static irqreturn_t mxc_hdp5v_irq_thread(int irq, void *data)
 {
 	struct mxc_hdmi_rx_dev *hdmi_rx =  data;
+
+	pr_info("%s hello\n", __func__);
 
 	disable_irq_nosync(irq);
 
@@ -790,6 +1134,7 @@ static int mxc_hdmi_probe(struct platform_device *pdev)
 	struct mxc_hdmi_rx_dev *hdmi_rx;
 	struct resource *res;
 	u8 hpd;
+	u8 sts;
 	int ret = 0;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -897,7 +1242,13 @@ static int mxc_hdmi_probe(struct platform_device *pdev)
 		/* Cable Disconnedted, enable Plug in IRQ */
 		if (hpd == 0) {
 			enable_irq(hdmi_rx->irq[HPD5V_IRQ_IN]);
+			CDN_API_HDMIRX_SetHpd_blocking(&hdmi_rx->state, 0);
 			hdmi_rx->cable_plugin = false;
+			CDN_API_MainControl_blocking(&hdmi_rx->state, 0, &sts);
+			pr_info("%s(): called CDN_API_MainControl_blocking(0)\n",
+				__func__);
+			imx8qm_hdmi_phy_reset(&hdmi_rx->state, 0);
+			CDN_API_General_AssertPhyReset_blocking(&hdmi_rx->state);
 		}
 	}
 	if (hdmi_rx->irq[HPD5V_IRQ_OUT] > 0) {
@@ -907,15 +1258,55 @@ static int mxc_hdmi_probe(struct platform_device *pdev)
 						IRQF_ONESHOT, dev_name(dev), hdmi_rx);
 		if (ret) {
 			dev_err(&pdev->dev, "can't claim irq %d\n",
-							hdmi_rx->irq[HPD5V_IRQ_OUT]);
+				hdmi_rx->irq[HPD5V_IRQ_OUT]);
 			goto failed;
 		}
 		if (hpd == 1) {
+
+			//uint32_t events;
+			CDN_API_MainControl_blocking(&hdmi_rx->state, 0, &sts);
+			pr_info("%s(): called CDN_API_MainControl_blocking(0)\n",
+				__func__);
+			imx8qm_hdmi_phy_reset(&hdmi_rx->state, 0);
+			CDN_API_General_AssertPhyReset_blocking(&hdmi_rx->state);
+			
+			CDN_API_MainControl_blocking(&hdmi_rx->state, 1, &sts);
+			pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
+				__func__);
+			
+			CDN_API_General_DeassertPhyReset_blocking(&hdmi_rx->state);
+		
+			/* Don't care about this initial status read, just clearing it out first 
+		   	   before triggering HPD...
+			*/
+/*
+			cdn_apb_read(&hdmi_rx->state,SW_EVENTS1<<2,&events);
 			hdmirx_hotplug_trigger(&hdmi_rx->state);
-			hdmirx_startup(&hdmi_rx->state);
+			hdmirx_wait_edid_read(&hdmi_rx->state);
+*/		
+			pr_info("mxc_hdmi_probe calling hdmirx_startup\n");
+			if (hdmirx_startup(&hdmi_rx->state) < 0) {
+				hdmi_rx->initialized = false;
+				hdmirx_hotplug_trigger(&hdmi_rx->state);
+				hdmirx_wait_edid_read(&hdmi_rx->state);
+				hdmi_rx->tmds_clk = -1;
+			} else {
+				hdmi_rx->initialized = true;
+				show_trace(&hdmi_rx->state,1);
+				show_trace(&hdmi_rx->state,1);
+				pr_info("Cleared trace logs\n");
+			}
 			/* Cable Connected, enable Plug out IRQ */
 			enable_irq(hdmi_rx->irq[HPD5V_IRQ_OUT]);
 			hdmi_rx->cable_plugin = true;
+#ifdef CONFIG_IMX_HDP_CEC
+			if (hdmi_rx->is_cec) {
+				mxc_hdmi_cec_init(hdmi_rx);
+				imx_cec_register(&hdmi_rx->cec);
+				hdmi_rx->cec_running = true;
+			}
+#endif
+			tmdsmon_init(hdmi_rx);
 		}
 	}
 
@@ -942,6 +1333,8 @@ static int mxc_hdmi_remove(struct platform_device *pdev)
 	u8 sts;
 
 	dev_dbg(dev, "%s\n", __func__);
+
+	tmdsmon_cleanup(hdmi_rx);
 	v4l2_async_unregister_subdev(&hdmi_rx->sd);
 	media_entity_cleanup(&hdmi_rx->sd.entity);
 
@@ -953,6 +1346,10 @@ static int mxc_hdmi_remove(struct platform_device *pdev)
 	/* Reset HDMI RX PHY */
 	CDN_API_HDMIRX_Stop_blocking(state);
 	CDN_API_MainControl_blocking(state, 0, &sts);
+	dev_info(dev, "%s(): called CDN_API_MainControl_blocking(0)\n",
+		 __func__);
+
+	hdmirx_hdcp_disable(&hdmi_rx->state);
 
 	mxc_hdmi_clock_disable(hdmi_rx);
 	pm_runtime_put_sync(dev);

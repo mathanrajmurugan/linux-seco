@@ -1629,7 +1629,7 @@ _AdjustParam(
     if (of_find_compatible_node(NULL, NULL, "fsl,imx8mq-gpu") &&
         ((Args->baseAddress + totalram_pages() * PAGE_SIZE) > 0x100000000))
 #else
-     if (of_find_compatible_node(NULL, NULL, "fsl,imx8mq-gpu") &&
+     if ((of_find_compatible_node(NULL, NULL, "fsl,imx8mq-gpu") || (of_find_compatible_node(NULL, NULL, "fsl,imx8mm-gpu"))) &&
          ((Args->baseAddress + totalram_pages * PAGE_SIZE) > 0x100000000))
 #endif
     {

@@ -498,4 +498,3 @@ MODULE_AUTHOR("DC MS SECO");
 MODULE_DESCRIPTION("SECO generic PWM Driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:pwm-generic");
-

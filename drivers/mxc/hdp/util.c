@@ -358,3 +358,78 @@ u16 internal_get_msg_len(state_struct *state)
 {
 	return ((u16) state->rxBuffer[2] << 8) | (u16) state->rxBuffer[3];
 }
+
+int show_trace(state_struct *state, u8 init)
+{
+	u8 buf[256];
+	u8 buf_offset = 0;
+	u16 const buf_size = sizeof(buf);
+
+	u8 trace[256];
+	u16 trace_size, trace_offset;
+
+	/* Limit number of reads in case of FW flooding the trace buffer */
+	u16 nreads = 16;
+
+	CDN_API_STATUS ret;
+	int err = 0;
+
+	while (nreads-- > 0) {
+		/* Always request the  max size, the FW will what it can */
+		ret = CDN_API_General_GetTrace_blocking(state,
+							trace, sizeof(trace),
+							&trace_size);
+		if (ret != CDN_OK) {
+			pr_err("FWTRACE: Failed to read trace data\n");
+			err = -1;
+			goto out;
+		}
+
+		/* No trace data */
+		if (trace_size == 0)
+			goto out;
+
+		/* Init, just clear out data */
+		if (init) {
+			buf_offset = 0;
+			trace_size = 0;
+			trace_offset = 0;
+			continue;
+		}
+		
+		trace_offset = 0;
+
+		do {
+			buf[buf_offset] = trace[trace_offset];
+
+			/* EOL reached or line too long*/
+			if (buf[buf_offset] == '\n' ||
+			    buf_offset == buf_size - 1) {
+				buf[buf_offset] = '\0';
+				pr_info("FWTRACE: %s\n", buf);
+				if (trace[trace_offset] == '\n')
+					++trace_offset;
+				/*
+				 * else don't advance trace offset -
+				 * keep current char
+				 */
+				buf_offset = 0;
+			} else {
+				++buf_offset;
+				++trace_offset;
+			}
+		} while (trace_offset < trace_size);
+	}
+
+out:
+	/* Display partial line, if present */
+	if (buf_offset > 0) {
+		buf[buf_offset] = '\0';
+		pr_info("FWTRACE: %s\n", buf);
+	}
+
+	if (nreads == 0 && trace_size == sizeof(trace))
+		pr_info("FWTRACE: There could be more...\n");
+
+	return 0;
+}

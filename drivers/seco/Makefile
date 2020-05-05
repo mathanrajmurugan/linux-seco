@@ -4,3 +4,6 @@ obj-$(CONFIG_SECO_CPLD_FW)   += cpld.o cgpio_expander.o lpc_bridge.o sio_w83627.
 obj-$(CONFIG_SECO_PWR_BTN)   += pwrbutton_management.o
 obj-$(CONFIG_BUZZER)         += pwm_generic.o
 obj-$(CONFIG_BOARD_SECO_ID)  += board_id.o
+obj-$(CONFIG_HAVE_IMX8_SOC)  += apx_wdog-trigger.o\
+                                pwm_generic.o\
+                                gsm-modem.o

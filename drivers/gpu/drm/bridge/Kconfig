@@ -162,6 +162,8 @@ source "drivers/gpu/drm/bridge/analogix/Kconfig"
 
 source "drivers/gpu/drm/bridge/adv7511/Kconfig"
 
+source "drivers/gpu/drm/bridge/sn65dsi84/Kconfig"
+
 source "drivers/gpu/drm/bridge/synopsys/Kconfig"
 
 config DRM_ITE_IT6263

@@ -1,0 +1,50 @@
+/*
+ * Copyright 2017 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "fsl,imx8mm-evk","seco,seco-imx8mm-c61", "fsl,imx8mm";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               OV5640                                     |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@1 {
+                target = <&ov5640_mipi>;
+                __overlay__ {
+			status = "okay";
+		};
+        };	
+
+	fragment@2 {
+		target = <&mipi_csi_1>;
+                __overlay__ {
+			status = "okay";
+                };
+	};
+	
+	fragment@3 {
+                target = <&csi1_bridge>;
+                __overlay__ {
+			status = "okay";
+		};
+
+	};
+};

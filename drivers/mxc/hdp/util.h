@@ -393,4 +393,5 @@ int cdn_sapb_write(state_struct *state, u32 addr, u32 value);
 void cdn_sleep(u32 ms);
 void cdn_usleep(u32 us);
 u16 internal_get_msg_len(state_struct *state);
+int show_trace(state_struct *state, u8 init);
 #endif

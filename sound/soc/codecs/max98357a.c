@@ -39,12 +39,18 @@ static int max98357a_daiops_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		gpiod_set_value(sdmode, 1);
+
+	/* 
+	 * Commented out because in C61 
+	 * gpio expander gpios can't be setted from here
+	 */
+
+	//	gpiod_set_value(sdmode, 1);	
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		gpiod_set_value(sdmode, 0);
+	//	gpiod_set_value(sdmode, 0);
 		break;
 	}
 
@@ -62,8 +68,8 @@ static const struct snd_soc_dapm_route max98357a_dapm_routes[] = {
 static int max98357a_component_probe(struct snd_soc_component *component)
 {
 	struct gpio_desc *sdmode;
-
-	sdmode = devm_gpiod_get_optional(component->dev, "sdmode", GPIOD_OUT_LOW);
+	/* Enable gpio inverted because in c61 power enable is high */
+	sdmode = devm_gpiod_get_optional(component->dev, "sdmode", GPIOD_OUT_HIGH);
 	if (IS_ERR(sdmode))
 		return PTR_ERR(sdmode);
 

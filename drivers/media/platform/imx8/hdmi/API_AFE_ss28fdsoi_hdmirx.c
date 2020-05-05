@@ -45,6 +45,18 @@
  */
 
 #include "API_AFE_ss28fdsoi_hdmirx.h"
+#include "mxc-hdmi-rx.h"
+
+#include <linux/ktime.h>
+
+#define ktime_timeout_ms(ms_) ktime_add(ktime_get(), ms_to_ktime(ms_))
+
+#define PMA_CMN_READY_TIMEOUT_MS 5
+#define PMA_RX_CLK_SIGNAL_DETECT_TIMEOUT_MS 10
+#define PMA_RX_CLK_FREQ_DETECT_TIMEOUT_MS 10
+#define PMA_RX_CLK_FREQ_DETECT_MIN_THRESH 24000
+#define TMDS_STABLE_DETECT_COUNT_THRESHOLD 3
+#define TMDS_STABLE_DETECT_TIMEOUT_MS 2000
 
 static inline void write16(state_struct *state, u32 addr, u16 val)
 {
@@ -96,43 +108,84 @@ void arc_config(state_struct *state)
 	u16 reg_val;
 
 	write16(state, TXDA_CYA_AUXDA_CYA_ADDR, 0x0001);
-
+	msleep(1);
 	write16(state, TX_DIG_CTRL_REG_1_ADDR, 0x3);
+	msleep(1);
 	write16(state, TX_DIG_CTRL_REG_2_ADDR, 0x0024);
+	msleep(1);
 
 	reg_val = read16(state, TX_ANA_CTRL_REG_1_ADDR);
 	reg_val |= 0x2000;
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, reg_val);
+	msleep(1);
 
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x0100);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x0300);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_3_ADDR, 0x0000);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2008);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2018);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2098);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030C);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_5_ADDR, 0x0010);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_4_ADDR, 0x4001);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2198);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030D);
+	msleep(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030F);
 }
 
 void pma_config(state_struct *state)
 {
 	int i;
-	u16 reg_val = 0;
+
+	u16 const RX_CLK_SLICER_CAL_TUNE_VAL = 0x0008;
+	u16 const RX_CLK_TERM_CTRL_VAL = 0x0001;
+	u16 const RX_CLK_SLICER_CAL_INIT_TMR_VAL = 0x00FF;
+	u16 const RX_CLK_SLICER_CAL_ITER_TMR_VAL = 0x00FF;
+
 	pr_info("pma_config() Configuring PMA\n");
 
 	write16(state, CMN_CMSMT_REF_CLK_TMR_VALUE_ADDR, 0x0801);
-	write16(state, RX_CLK_SLICER_CAL_INIT_TMR_ADDR, 0x00FF);
+
+	pr_info("Changing RX_CLK_TERM_CTRL from 0x%.4X to 0x%.4X\n",
+		read16(state, RX_CLK_TERM_CTRL_ADDR),
+		RX_CLK_TERM_CTRL_VAL);
+	write16(state, RX_CLK_TERM_CTRL_ADDR, RX_CLK_TERM_CTRL_VAL);
+
+	pr_info("Changing RX_CLK_SLICER_CAL_TUNE_ADDR from 0x%.4X to 0x%.4X\n",
+		read16(state, RX_CLK_SLICER_CAL_TUNE_ADDR),
+		RX_CLK_SLICER_CAL_TUNE_VAL);
+	write16(state, RX_CLK_SLICER_CAL_TUNE_ADDR, RX_CLK_SLICER_CAL_TUNE_VAL);
+
+	pr_info("Changing RX_CLK_SLICER_CAL_INIT_TMR from 0x%.4X to 0x%.4X\n",
+		read16(state, RX_CLK_SLICER_CAL_INIT_TMR_ADDR),
+		RX_CLK_SLICER_CAL_INIT_TMR_VAL);
+	write16(state, RX_CLK_SLICER_CAL_INIT_TMR_ADDR,
+		RX_CLK_SLICER_CAL_INIT_TMR_VAL);
+
+	pr_info("Changing RX_CLK_SLICER_CAL_ITER_TMR from 0x%.4X to 0x%.4X\n",
+		read16(state, RX_CLK_SLICER_CAL_ITER_TMR_ADDR),
+		RX_CLK_SLICER_CAL_ITER_TMR_VAL);
+	write16(state, RX_CLK_SLICER_CAL_ITER_TMR_ADDR,
+		RX_CLK_SLICER_CAL_ITER_TMR_VAL);
+
 	write16(state, CMN_RXCAL_INIT_TMR_ADDR, 0x003F);
 	write16(state, CMN_DIAG_PLL0_TEST_MODE_ADDR, 0x0022);
 	multi_write16(state, XCVR_PSM_CAL_TMR_ADDR, 0x0160);
 
-	/* Drives the rx_differential_invert PMA input for the associated lane */
+	/* Drives the rx_differential_invert PMA input for the selected lane */
 	for (i = 0; i < 3; i++) {
-		reg_val = 0x0c61;
+		u16 const reg_val = 0x0c61;
 		write16(state, (PHY_PMA_XCVR_CTRL_ADDR | (i << 6)), reg_val);
 	}
 }
@@ -140,71 +193,111 @@ void pma_config(state_struct *state)
 void pre_data_rate_change(state_struct *state)
 {
 	u16 reg_val;
-
-	pr_info("pre_data_rate_change() Set the A3 power mode\n");
+	int i;
+	int ret_val;
+	const time_t timeout = ktime_timeout_ms(1500);
+	
+	reg_val = read16(state, PHY_PMA_CMN_CTRL2_ADDR);
+	pr_info("PHY_PMA_CMN_CTRL2_ADDR: 0x%04X\n",reg_val);
+	
+	/* Turn off frequency measurement: */
+	write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR, 0x0000);
+	
+	/* Request A3 power state */
+	/* This doesn't seem to work properly, if a reset is applied 
+	   with the PHY in A3 it seems to hang?
+	*/
 	reg_val = read16(state, PHY_MODE_CTL_ADDR);
-	reg_val &= 0xFFF0;
-	reg_val |= 0x0008;
-	write16(state, PHY_MODE_CTL_ADDR, reg_val);
+	if (reg_val & 0x00F0) {
+		ret_val = pma_power_state_chng(state,0x8);
+		pr_info("Shutting down PLL\n");
+		write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xEF00);
+		do {
+			if (ktime_after(ktime_get(), timeout)) {
+				pr_info("Timed out PHY_PMA_CMN_CTRL2_ADDR: 0x%04X\n",reg_val);
+				pr_info("Setting PHY reset\n");
+				imx8qm_hdmi_phy_reset(state, 0);
+				break;
+			}
+			reg_val = read16(state, PHY_PMA_CMN_CTRL2_ADDR);
+		} while ((reg_val & 0x0004) == 0x0000);
+	} else {
+		pr_info("Skipping A3 power change since PHY_MODE_CTL: 0x%04X\n",reg_val);
+		pr_info("Assuming PHY just out of reset\n");
+	}
+	
+	/* Clear power state and set transceiver resets active */
+	write16(state, PHY_MODE_CTL_ADDR, 0x0000);
+	
+	/* Setting PMA Transceiver Control for each lane to default */
+	for (i = 0; i < 3; i++) {
+		reg_val = 0x0C61;
+		write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6), reg_val);
+	}
 
-	msleep(20);
-
-	/* Disable PLL */
-	pr_info("pre_data_rate_change() Disable PLL0\n");
-	reg_val = read16(state, PHY_MODE_CTL_ADDR);
-	reg_val &= 0xEFFF;
-	write16(state, PHY_MODE_CTL_ADDR, reg_val);
-
-	msleep(20);
+	reg_val = read16(state, PHY_PMA_CMN_CTRL2_ADDR);
+	pr_info("PHY_PMA_CMN_CTRL2_ADDR: 0x%04X\n",reg_val);
+	
+	pr_info("pre_data_rate_change() Finished successfully\n");
 }
 
 int pma_cmn_ready(state_struct *state)
 {
-	u32 i;
+	const time_t timeout = ktime_timeout_ms(PMA_CMN_READY_TIMEOUT_MS);
 
-	for (i = 0; i < 20; i++) {
+	do {
 		if (read16(state, PHY_PMA_CMN_CTRL1_ADDR) & (1 << 0))
-			break;
-		msleep(10);
-	}
-	if (i == 20)
-		return -1;
-	return 0;
+			return 0;
+		msleep(1);
+	} while (ktime_before(ktime_get(), timeout));
+
+	pr_info("%s timeout\n", __func__);
+
+	return -1;
+}
+
+int phy_in_reset(state_struct *state)
+{
+	if (read16(state, PHY_PMA_CMN_CTRL1_ADDR) & (1 << 0))
+		return 0;
+	else
+		return 1;
 }
 
 int pma_rx_clk_signal_detect(state_struct *state)
 {
-	u32 i;
+	const time_t timeout =
+		ktime_timeout_ms(PMA_RX_CLK_SIGNAL_DETECT_TIMEOUT_MS);
 
-	for (i = 0; i < 20; i++) {
+	do {
 		if (read16(state, PHY_MODE_CTL_ADDR) & (1 << 8))
-			break;
-		msleep(10);
-	}
-	if (i == 20)
-		return -1;
-	return 0;
+			return 0;
+	} while (ktime_before(ktime_get(), timeout));
+
+/*	pr_info("%s timeout\n", __func__);*/
+
+	return -1;
 }
 
 int pma_rx_clk_freq_detect(state_struct *state)
 {
 	u16 reg_val;
 	u32 rx_clk_freq;
-	u32 i;
 
-	pr_info("pma_rx_clk_freq_detect() Starting Rx clock frequency detection...\n");
+	const time_t timeout =
+		ktime_timeout_ms(PMA_RX_CLK_FREQ_DETECT_TIMEOUT_MS);
 
 	/* Start frequency detection: */
 	write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR, 0x8000);
 
 	/* Wait for pma_rx_clk_freq_detect_done */
-	for (i = 0; i < 20; i++) {
-		if (read16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR) & (1 << 14))
-			break;
-		msleep(10);
-	}
-	if (i == 20)
-		return -1;
+	while (!(read16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR) & (1 << 14)))
+		if (ktime_after(ktime_get(), timeout)) {
+			write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR,
+				0x0000);
+			pr_info("%s() freq detect -> timeout\n", __func__);
+			return -1;
+		}
 
 	/* Read the measured value */
 	reg_val = read16(state, CMN_CMSMT_TEST_CLK_CNT_VALUE_ADDR);
@@ -214,9 +307,98 @@ int pma_rx_clk_freq_detect(state_struct *state)
 
 	/* Turn off frequency measurement: */
 	write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR, 0x0000);
-	pr_info("pma_rx_clk_freq_detect() Starting Rx clock frequency detection... DONE (TMDS clock freq: %d kHz)\n",
-	     rx_clk_freq);
+	
 	return rx_clk_freq;
+}
+
+int hdmirx_get_stable_tmds(state_struct *state)
+{
+	struct mxc_hdmi_rx_dev *hdmi_rx = state_to_mxc_hdmirx(state);
+	const time_t timeout = ktime_timeout_ms(TMDS_STABLE_DETECT_TIMEOUT_MS);
+	char i = 0;
+
+/*	pr_info("MEASURING TMDS\n");*/
+	
+	int tmds = -1;
+	do {
+		int val;
+
+		if (hdmi_rx->tmdsmon_state == 2) {
+			pr_info("TMDS Monitor cleanup in progress...\n");
+			return -1;
+		}
+		
+		mdelay(5);
+
+		val = pma_rx_clk_freq_detect(state);
+		if ((tmds < (val + 50)) && (tmds > (val - 50))) {
+			i++;
+		} else if (tmds != val) {
+			i = 0;
+			tmds = val;
+		}
+
+		if (i == TMDS_STABLE_DETECT_COUNT_THRESHOLD) {
+/*			pr_info("DONE MEASURING TMDS, got %d\n",tmds);*/
+			if ((tmds < PMA_RX_CLK_FREQ_DETECT_MIN_THRESH) && (tmds >= 0)) {
+				pr_info("hdmirx_get_stable_tmds() measured value not valid %d\n",tmds);
+				return -1;
+			}
+			return tmds; /* Can be -1 */
+		}
+	} while (ktime_before(ktime_get(), timeout));
+	
+	/*pr_info("hdmirx_get_stable_tmds() timeout\n");*/
+	return -1;
+}
+
+int pma_power_state_chng(state_struct *state, u8 power_state)
+{
+	u16 reg_val;
+	reg_field_t xcvr_power_state_req;
+	reg_field_t xcvr_power_state_ack;
+	const time_t timeout = ktime_timeout_ms(100);
+
+	xcvr_power_state_req.label = "xcvr_power_state_req";
+	xcvr_power_state_ack.label = "xcvr_power_state_ack";
+	xcvr_power_state_req.msb = 3;
+	xcvr_power_state_req.lsb = 0;
+	xcvr_power_state_ack.msb = 7;
+	xcvr_power_state_ack.lsb = 4;
+	set_field_value(&xcvr_power_state_req, power_state);
+	set_field_value(&xcvr_power_state_ack, power_state);
+	
+	/* Get current power state: */
+	/* PHY_MODE_CTL */
+	reg_val = read16(state, PHY_MODE_CTL_ADDR);
+	pr_info("pma_power_state_chng() PHY_MODE_CTL: 0x%04X\n",reg_val);
+	pr_info("pma_power_state_chng() Current power state: 0x%02X\n", ((reg_val & 0x00F0)>> 4));
+	
+	reg_val &= 0xFFF0;
+	reg_val |= set_reg_value(xcvr_power_state_req);
+
+	write16(state, PHY_MODE_CTL_ADDR, reg_val);
+	pr_info("pma_power_state_chng() Writing PHY_MODE_CTL: 0x%04X\n",reg_val);
+	pr_info("pma_power_state_chng() Requested power mode 0x%02X\n",power_state);
+	
+	/* Wait for power mode acknowledged: */
+	/* PHY_MODE_CTL */
+
+	do {
+		msleep(1);
+		if (ktime_after(ktime_get(), timeout)) {
+			pr_info("pma_power_state_chng() Timed out with PHY_MODE_CTL: 0x%04X\n",reg_val);
+			write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xFFF0);
+			return -1;
+		}
+		reg_val = read16(state, PHY_MODE_CTL_ADDR);
+
+	} while ((reg_val & 0x00F0) != set_reg_value(xcvr_power_state_ack));
+	
+	write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xFFF0);
+	pr_info("pma_power_state_chng() Done with PHY_MODE_CTL: 0x%04X\n",reg_val);
+	
+	return 0;
 }
 
 int pma_pll_config(state_struct *state,
@@ -228,6 +410,7 @@ int pma_pll_config(state_struct *state,
 	int i, loop;
 	u16 reg_val;
 	u64 vco_freq_khz;
+	const time_t timeout = ktime_timeout_ms(1000);
 
 	reg_field_t cmnda_pll0_ip_div;
 	reg_field_t cmnda_pll0_hs_sym_div_sel;
@@ -713,8 +896,10 @@ int pma_pll_config(state_struct *state,
 				set_field_value(&cmn_pll_clk_div2_sel, 0x1);
 				break;
 			}
-		} else
+		} else {
 			pr_err("TMDS clock frequency (%d KHz) is out of range\n", rx_clk_freq);
+			return -1;
+		}
 
 	} else {		/* TMDS_BIT_CLOCK_RATIO_1_40 */
 		if (inside_f(rx_clk_freq, 85000, 150000)) {
@@ -775,9 +960,11 @@ int pma_pll_config(state_struct *state,
 				set_field_value(&cmn_pll_clk_div2_sel, 0x1);
 				break;
 			}
-		} else
+		} else {
 			pr_err("pma_pll_config() *E: TMDS clock frequency (%d kHz) is out of range\n",
 			     rx_clk_freq);
+			return -1;
+		}
 	}
 
 	vco_freq_khz =
@@ -875,8 +1062,10 @@ int pma_pll_config(state_struct *state,
 		set_field_value(&cmnda_pll0_const_ndac_cntrl, 0x0);
 		set_field_value(&cmnda_pll0_const_pmos_cntrl, 0x04);
 		set_field_value(&cmnda_pll0_ptat_ndac_cntrl, 0x0D);
-	} else
+	} else {
 		pr_err("%s VCO frequency (%llu KHz) is out of range\n", __func__, vco_freq_khz);
+		return -1;
+	}
 
 	if (inside_f(vco_freq_khz, 3000000, 4000000)) {
 		set_field_value(&rxda_pi_iq_bias_trim, 0x5);
@@ -1012,15 +1201,12 @@ int pma_pll_config(state_struct *state,
 
 	/* Wait for PLL0 ready: */
 	/* PHY_PMA_CMN_CTRL2 */
-	for (i = 0; i < 20; i++) {
-		if (read16(state, PHY_PMA_CMN_CTRL2_ADDR) & (1 << 0))
-			break;
-		msleep(10);
-	}
-	if (i == 20) {
-		pr_err("pma_pll_ready failed\n");
-		return -1;
-	}
+	do {
+		msleep(1);
+		if (ktime_after(ktime_get(), timeout))
+			goto timeout_err;
+
+	} while ((read16(state, PHY_PMA_CMN_CTRL2_ADDR) & (1 << 0)) == 0);
 
 	/* Turn on output clocks: */
 	/* PHY_PMA_CMN_CTRL2 */
@@ -1029,7 +1215,7 @@ int pma_pll_config(state_struct *state,
 	reg_val |= set_reg_value(iso_pma_cmn_pll0_clk_en);
 	write16(state, PHY_PMA_CMN_CTRL2_ADDR, reg_val);
 
-	if (data_rate_change) {
+/*	if (data_rate_change) {*/
 		pr_info("pma_pll_config() Disable Rx Eq Training\n");
 		for (i = 0; i < 3; i++) {
 			reg_val =
@@ -1037,10 +1223,12 @@ int pma_pll_config(state_struct *state,
 			reg_val &= 0xFFEF;
 			write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6), reg_val);
 		}
-	}
+/*	}*/
 	/* Get current power state: */
 	/* PHY_MODE_CTL */
 	reg_val = read16(state, PHY_MODE_CTL_ADDR);
+	pr_info("pma_pll_config() PHY_MODE_CTL: 0x%04X\n",reg_val);
+	
 	reg_val &= 0x00F0;
 	pr_info("pma_pll_config() Current power state: 0x%02X\n", (reg_val >> 4));
 
@@ -1056,43 +1244,22 @@ int pma_pll_config(state_struct *state,
 	loop = 0;
 	do {
 		reg_val = (1 << 13);
+		if (ktime_after(ktime_get(), timeout))
+			goto timeout_err;
 		for (i = 0; i < 3; i++) {
 			reg_val &= read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6)) & (1 << 13);
 			pr_info("pma_pll_config() xcvr_psm_ready(%0d): 0x%0X\n", i, reg_val >> 13);
 		}
-		msleep(10);
-		loop++;
+		msleep(1);
 	} while (!reg_val && loop < 20);
-	/* Timeout */
-	if (loop == 20) {
-		pr_err("pma_pll_config() Waiting for xcvr_psm_ready... failed\n");
-		return -1;
-	}
 
 	/* Set A0 power state: */
 	/* PHY_MODE_CTL */
-	set_field_value(&xcvr_power_state_req, 0x1);
-	reg_val = set_reg_value(xcvr_pll_en);
-	reg_val |= set_reg_value(xcvr_link_reset_n);
-	reg_val |= set_reg_value(xcvr_power_state_req);
-	write16(state, PHY_MODE_CTL_ADDR, reg_val);
-	pr_info("pma_pll_config() Requested A0 power mode\n");
+	if (pma_power_state_chng(state,0x1))
+		goto timeout_err;
+	
 
-	/* Wait for A0 power mode acknowledged: */
-	/* PHY_MODE_CTL */
-	set_field_value(&xcvr_power_state_ack, 0x1);
-
-	for (i = 0; i < 20; i++) {
-		if (((read16(state, PHY_MODE_CTL_ADDR) & 0x00F0) == set_reg_value(xcvr_power_state_ack)))
-			break;
-		msleep(10);
-	}
-	if (i == 20) {
-		pr_err("Waiting for A0 power mode acknowledged failed\n");
-		return -1;
-	}
-
-	if (data_rate_change) {
+/*	if (data_rate_change) {*/
 		pr_info("pma_pll_config() Enable Rx Eq Training\n");
 		for (i = 0; i < 3; i++) {
 			reg_val =
@@ -1101,8 +1268,14 @@ int pma_pll_config(state_struct *state,
 			write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6),
 				reg_val);
 		}
-	}
+/*	}*/
+
 	return 0;
+
+timeout_err:
+	pr_info("pma_pll_config() Timeout error!\n");
+	return -1;
+
 }
 
 clk_ratio_t clk_ratio_detect(state_struct *state,
@@ -1225,7 +1398,7 @@ clk_ratio_t clk_ratio_detect(state_struct *state,
 		clk_ratio_detected = CLK_RATIO_3_4;
 		pr_info("Detected TMDS/pixel clock ratio of 3:4\n");
 	} else {
-		pr_err("Failed to detected TMDS/pixel clock ratio\n");
+		pr_err("Unable to detected TMDS/pixel clock ratio - using default\n");
 		pr_err("VIC: %02d and TMDS clock of %d KHz\n", vic, rx_clk_freq);
 	}
 

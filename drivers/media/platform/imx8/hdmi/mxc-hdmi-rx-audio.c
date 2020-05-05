@@ -164,6 +164,9 @@ static int mxc_hdmi_rx_audio(struct mxc_hdmi_rx_dev *hdmi)
 	CDN_API_STATUS status;
 	int ret;
 
+        if(hdmi->initialized==false)
+                return -EINVAL;
+
 	ret = get_audio_infoframe(state, &chan);
 	if (ret)
 		return ret;

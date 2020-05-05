@@ -516,3 +516,88 @@ CDN_API_STATUS CDN_API_General_GetHpdState_blocking(state_struct *state, u8 *hpd
 {
     internal_block_function(&state->mutex, CDN_API_General_GetHpdState(state, hpd_state));
 }
+
+CDN_API_STATUS CDN_API_General_GetTrace(state_struct *state,
+	u8 *buf, u16 req_count, u16 *rd_count)
+{
+	CDN_API_STATUS ret;
+
+	if (!state->running) {
+		if (!internal_apb_available(state))
+			return CDN_BSY;
+
+		internal_tx_mkfullmsg(state,
+				      MB_MODULE_ID_GENERAL, GENERAL_GET_TRACE,
+				      1, 2, req_count);
+		state->bus_type = CDN_BUS_TYPE_APB;
+		state->rxEnable = 1;
+		*rd_count = 0;
+
+		return CDN_STARTED;
+	}
+
+	internal_process_messages(state);
+
+	ret = internal_test_rx_head(state,
+				    MB_MODULE_ID_GENERAL, GENERAL_GET_TRACE);
+	if (ret != CDN_OK)
+		return ret;
+
+	/* Read only size first to have its copy ready for the second call */
+	internal_readmsg(state, 1, 2, rd_count);
+	internal_readmsg(state, 2, 2, rd_count, -*rd_count, buf);
+
+	return CDN_OK;
+}
+
+CDN_API_STATUS CDN_API_General_GetTrace_blocking(state_struct *state,
+	u8 *buf, u16 req_count, u16 *rd_count)
+{
+	internal_block_function(&state->mutex,
+				CDN_API_General_GetTrace(state, buf, req_count, rd_count));
+}
+
+
+CDN_API_STATUS CDN_API_General_AssertPhyReset(state_struct *state)
+{
+	if (!state->running) {
+		if (!internal_apb_available(state))
+			return CDN_BSY;
+		internal_tx_mkfullmsg(state, MB_MODULE_ID_GENERAL,
+				      GENERAL_ASSERT_PHY_BUS_RESET, 0);
+		state->bus_type = CDN_BUS_TYPE_APB;
+		return CDN_STARTED;
+	}
+
+	internal_process_messages(state);
+
+	return CDN_OK;
+}
+
+CDN_API_STATUS CDN_API_General_AssertPhyReset_blocking(state_struct *state)
+{
+	internal_block_function(&state->mutex,
+				CDN_API_General_AssertPhyReset(state));
+}
+
+CDN_API_STATUS CDN_API_General_DeassertPhyReset(state_struct *state)
+{
+	if (!state->running) {
+		if (!internal_apb_available(state))
+			return CDN_BSY;
+		internal_tx_mkfullmsg(state, MB_MODULE_ID_GENERAL,
+				      GENERAL_DEASSERT_PHY_BUS_RESET, 0);
+		state->bus_type = CDN_BUS_TYPE_APB;
+		return CDN_STARTED;
+	}
+
+	internal_process_messages(state);
+
+	return CDN_OK;
+}
+
+CDN_API_STATUS CDN_API_General_DeassertPhyReset_blocking(state_struct *state)
+{
+	internal_block_function(&state->mutex,
+				CDN_API_General_DeassertPhyReset(state));
+}
