@@ -1,0 +1,128 @@
+/*
+ * Copyright 2017-2018 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*
+ * HDMI_IN  - HDMI INPUT.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/imx8qm-clock.h>
+
+/ {
+        compatible = "fsl,imx8qm-mek","fsl,seco-imx8qm-c26", "fsl,imx8qm";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               HDMI IN	                              |
+ * |__________________________________________________________________________|
+ */
+
+
+	fragment@1 {
+		 target = <&sound_hdmirx>;
+		 __overlay__ {
+			compatible = "fsl,imx-audio-cdnhdmi";
+			model = "imx-audio-hdmi-rx";
+			audio-cpu = <&sai_hdmi_rx>;
+			protocol = <1>;
+			hdmi-in;
+		 };
+	 };
+
+	fragment@2 {
+		 target = <&isi_2>;
+		 __overlay__ {
+			interface = <4 0 2>;  /* <Input MIPI_VCx Output>
+								Input:  0-DC0, 1-DC1, 2-MIPI CSI0, 3-MIPI CSI1, 4-HDMI, 5-MEM
+								VCx:    0-VC0, 1-VC1, 2-VC2, 3-VC3, MIPI CSI only
+								Output: 0-DC0, 1-DC1, 2-MEM */
+			status = "okay";
+		 };
+	 };
+
+	fragment@3 {
+		 target = <&isi_3>;
+		 __overlay__ {
+			/* For HDMI RX 4K chain buf */
+			interface = <4 0 2>;  
+			status = "okay";
+		 };
+	 };
+
+	fragment@4 {
+		 target = <&mipi_csi_0>;
+		 __overlay__ {
+			status = "disabled";
+		 };
+	 };
+
+
+	fragment@5 {
+		 target = <&i2c0_mipi_csi0>;
+		 __overlay__ {
+			status = "disabled";
+		 };
+	 };
+
+	fragment@6 {
+		 target = <&hdmi_rx>;
+		 __overlay__ {
+			fsl,cec;
+			assigned-clocks = <&clk IMX8QM_HDMI_RX_HD_REF_SEL>,
+								<&clk IMX8QM_HDMI_RX_PXL_SEL>,
+								<&clk IMX8QM_HDMI_RX_HD_REF_DIV>;
+			assigned-clock-parents = <&clk IMX8QM_HDMI_RX_DIG_PLL_CLK>,
+									<&clk IMX8QM_HDMI_RX_BYPASS_CLK>;
+			assigned-clock-rates = <0>, <0>, <400000000>;
+			status = "okay";
+		 };
+	 };
+
+	fragment@7 {
+		 target = <&sai_hdmi_rx>;
+		 __overlay__ {
+			fsl,sai-asynchronous;
+			status = "okay";
+		 };
+	};
+
+	fragment@8 {
+		target = <&gpio2>;
+		__overlay__ {
+			status = "okay";
+		    line_b@0 {
+			gpio-hog;
+			gpios = <25 0>;
+			output-high;
+			line-name = "HDMI_SEL1";
+			};
+
+		    line_b@1 {
+			gpio-hog;
+			gpios = <26 0>;
+			output-low;
+			line-name = "HDMI_SEL2";
+			};
+
+		    line_b@2 {
+			gpio-hog;
+			gpios = <27 0>;
+			output-high;
+			line-name = "HDMI_IN_EN";
+			};
+
+		};
+	};
+};

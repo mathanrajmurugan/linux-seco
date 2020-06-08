@@ -172,6 +172,8 @@ struct sn65dsi84 {
 	bool lvds_channel_swap;
 	bool lvds_channel_reverse;
 	bool lvds_test_mode;
+	bool lvds_preserve_dsi_timings;
+	u32  mode_flags;
 	
 	unsigned int f_tmds;
 

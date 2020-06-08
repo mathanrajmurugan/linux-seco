@@ -89,6 +89,7 @@ CDN_API_STATUS CDN_API_AudioConfigCore(state_struct *state,
 	int i;
 	int lanesParam;
 	u32 I2S_DEC_PORT_EN_Val;
+	u32 pktAudioType;
 
 	if (numOfChannels == 2) {
 		if (lanes == 1)
@@ -104,11 +105,18 @@ CDN_API_STATUS CDN_API_AudioConfigCore(state_struct *state,
 			      0x20000);
 		cdn_apb_write(state,
 			      ADDR_SOURCE_AIF_SMPL2PCKT + (FIFO_CNTL << 2), 2);
+
+		if (freq == AUDIO_FREQ_768)
+			/* HBR configuration */
+			pktAudioType = 0x9;
+		else
+			pktAudioType = 0x2;
+
 		cdn_apb_write(state,
 			      ADDR_SOURCE_AIF_SMPL2PCKT + (SMPL2PKT_CNFG << 2),
 			      F_MAX_NUM_CH(numOfChannels - 1) |
 			      F_NUM_OF_I2S_PORTS_S((numOfChannels / 2) - 1) |
-				  (1 << 8) | (lanesParam << 11));
+			      F_AUDIO_TYPE(pktAudioType) | (lanesParam << 11));
 
 		if (numOfChannels == 2)
 			I2S_DEC_PORT_EN_Val = 1;
@@ -122,6 +130,7 @@ CDN_API_STATUS CDN_API_AudioConfigCore(state_struct *state,
 			      ADDR_SOURCE_AIF_DECODER + (AUDIO_SRC_CNFG << 2),
 			      0x01000 | F_AUDIO_SAMPLE_WIDTH(width) |
 			      F_AUDIO_CH_NUM(numOfChannels - 1) |
+			      F_AUDIO_CHANNEL_TYPE(pktAudioType) |
 			      F_I2S_DEC_PORT_EN(I2S_DEC_PORT_EN_Val));
 
 		for (i = 0; i < (numOfChannels + 1) / 2; i++) {
@@ -143,6 +152,7 @@ CDN_API_STATUS CDN_API_AudioConfigCore(state_struct *state,
 				      F_ORIGINAL_SAMP_FREQ(0xC));
 			break;
 		case AUDIO_FREQ_192:
+		case AUDIO_FREQ_768:
 			cdn_apb_write(state, ADDR_SOURCE_AIF_DECODER +
 				      (COM_CH_STTS_BITS << 2),
 				      4 | F_SAMPLING_FREQ(0xE) |

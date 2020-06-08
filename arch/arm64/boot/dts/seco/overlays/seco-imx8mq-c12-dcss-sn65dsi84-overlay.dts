@@ -1,0 +1,155 @@
+/*
+ * Copyright 2017 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include <dt-bindings/clock/imx8mq-clock.h>
+
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "fsl,imx8mq-evk","seco,seco-imx8mq-c12", "fsl,imx8mq";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               WiFi                                       |
+ * |__________________________________________________________________________|
+ */
+
+
+        fragment@1 {
+                target = <&hdmi>;
+                __overlay__ {
+			status = "disabled";
+		 };
+	};
+
+        fragment@2 {
+                target = <&soundhdmi>;
+                __overlay__ {
+			status = "disabled";
+		 };
+	};
+
+	fragment@3 {
+                target = <&ov5640_mipi>;
+                __overlay__ {
+                        status = "disabled";
+                 };
+        };
+
+	fragment@5 {
+                target = <&dcss>;
+                __overlay__ {
+			status = "okay";
+			disp-dev = "mipi_disp";
+
+			clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>,
+				 <&clk IMX8MQ_CLK_DISP_AXI_ROOT>,
+				 <&clk IMX8MQ_CLK_DISP_RTRM_ROOT>,
+				 <&clk IMX8MQ_CLK_DC_PIXEL>,
+				 <&clk IMX8MQ_CLK_DISP_DTRC>;
+			clock-names = "apb", "axi", "rtrm", "pix", "dtrc";
+			assigned-clocks = <&clk IMX8MQ_CLK_DC_PIXEL>,
+					  <&clk IMX8MQ_CLK_DISP_AXI>,
+					  <&clk IMX8MQ_CLK_DISP_RTRM>;
+			assigned-clock-parents = <&clk IMX8MQ_VIDEO_PLL1_OUT>,
+						 <&clk IMX8MQ_SYS1_PLL_800M>,
+						 <&clk IMX8MQ_SYS1_PLL_800M>;
+			assigned-clock-rates = <600000000>,
+					       <800000000>,
+					       <400000000>;
+			port@0 {
+				dcss_mipi_dsi: endpoint@0 {
+					remote-endpoint = <&mipi_dsi_in>;
+	              		};
+			};
+		};
+        };	
+
+	fragment@6 {
+                target = <&panel_lvds>;
+                __overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+                        port@0 {
+                                reg = <0>;
+                                panel_in: endpoint@0 {
+                                        remote-endpoint = <&bridge_to_panel>;
+                                };
+                        };
+
+                 };
+        };
+
+	fragment@7 {
+		target = <&adv_bridge>;
+                __overlay__ {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        lvds,datamap = "jeida";
+                        lvds,dual-channel;
+			lvds,preserve-dsi-timings;
+						/*include/drm/drm_mipi_dsi.h*/
+			dsi,mode-flags = <0x1>; /*MIPI_DSI_MODE_VIDEO*/
+                        status = "okay";
+
+                        port@0 {
+				reg = <0>;
+                                bridge_to_mipi: endpoint@0 {
+                                        remote-endpoint = <&mipi_dsi_bridge_out>;
+                                };
+                        };
+
+			port@1 {
+				reg = <1>;
+				bridge_to_panel: endpoint@1 {
+					remote-endpoint = <&panel_in>;
+				};
+			};
+                };
+	};
+
+	fragment@8 {
+                target = <&mipi_dsi_phy>;
+                __overlay__ {
+                        status = "okay";
+                 };
+        };
+	
+	fragment@9 {
+                target = <&mipi_dsi>;
+                __overlay__ {
+			status = "okay";
+			pwr-delay = <10>;
+			port@1 {
+				mipi_dsi_in: endpoint@1 {
+					remote-endpoint = <&dcss_mipi_dsi>;
+				};
+			};
+		};
+	};
+
+	fragment@10 {
+                target = <&mipi_dsi_bridge>;
+                __overlay__ {
+                        status = "okay";
+			port@1 {
+				mipi_dsi_bridge_out: endpoint@2 {
+					remote-endpoint = <&bridge_to_mipi>;
+				};
+			};
+		};
+        };
+};

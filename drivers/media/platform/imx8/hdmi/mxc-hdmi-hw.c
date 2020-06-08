@@ -187,7 +187,7 @@ int get_avi_infoframe(state_struct *state)
 		buf[0], buf[1], buf[2], buf[3], buf[4],
 		buf[5], buf[6], buf[7], buf[8], buf[9], buf[10], buf[11],
 		buf[12], buf[13], buf[14], buf[15], buf[16], buf[17]);
-	pr_info("--- avi infoframe old:                %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X\n",
+	pr_info("--- avi infoframe old: %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X\n",
 		hdmi_rx->avi[0], hdmi_rx->avi[1], hdmi_rx->avi[2],
 		hdmi_rx->avi[3], hdmi_rx->avi[4], hdmi_rx->avi[5],
 		hdmi_rx->avi[6], hdmi_rx->avi[7], hdmi_rx->avi[8],
@@ -195,32 +195,12 @@ int get_avi_infoframe(state_struct *state)
 		hdmi_rx->avi[12]);
 
 	memcpy(hdmi_rx->avi, avi, sizeof(hdmi_rx->avi));
-	
 
 	hdmi_rx->vic_code = avi[3] & 0x7F; /* VIC value */
 	hdmi_rx->pixel_encoding = avi[0] >> 5 & 3; /* Y value */
 
 	return 1;
 }
-
-/* According to HDMI_specification 1.4 */
-#define PACKET_TYPE                         0u
-#define VERSION                             1u
-#define LENGTH                              2u
-#define LENGHT_MASK                         0x1Fu
-#define LENGHT_SHIFT                        0x0u
-// the #3 seems to be empty, not clear why.
-#define CHECKSUM                            4u  
-#define IEEE_1                              5u
-#define IEEE_2                              6u
-#define IEEE_3                              7u 
-#define HDMI_VIDEO_FORMAT                   8u 
-#define HDMI_VIDEO_FORMAT_MASK              0x7u
-#define HDMI_VIDEO_FORMAT_SHIFT             0x5u
-#define HDMI_VIC                            9u
-
-#define HDMI_VIDEO_FORMAT_EXTENDED_RESOLUTION 1u
-#define HDMI_VIDEO_FORMAT_3D_FORMAT           2u
 
 static int get_vendor_infoframe(state_struct *state)
 {
@@ -237,15 +217,10 @@ static int get_vendor_infoframe(state_struct *state)
 		return -1;
 
 	/* Check if header is valid (version 1 only) */
-	if (buf[PACKET_TYPE] != 0x81 || buf[VERSION] != 0x01)
+	if (buf[0] != 0x81 || buf[1] != 0x01)
 		return -1;
 
-	ieee_oui = buf[IEEE_1] | buf[IEEE_2] << 8 | buf[IEEE_3] << 16;
-
-	pr_info("--- vs infoframe new: "
-		"%.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X %.2X\n",
-		buf[0], buf[1], buf[2], buf[3], buf[4],
-		buf[5], buf[6], buf[7], buf[8], buf[9], buf[10]);
+	ieee_oui = buf[5] | buf[6] << 8 | buf[7] << 16;
 
 	/* Get IEEE OUI */
 	if (ieee_oui == 0x000C03)
@@ -254,40 +229,14 @@ static int get_vendor_infoframe(state_struct *state)
 		dev_info(&hdmi_rx->pdev->dev, "HDMI 2.0 Vendor Specific Infoframe\n");
 	else
 		dev_err(&hdmi_rx->pdev->dev,
-			"Error Vendor Infoframe IEEE OUI=0x%6X\n", ieee_oui);
+			"Error Vendro Infoframe IEEE OUI=0x%6X\n", ieee_oui);
 
+	/* Extened resoluction format */
+	if ((buf[9] >> 5 & 0x07) == 1) {
+		hdmi_rx->hdmi_vic = buf[10];
+		dev_info(&hdmi_rx->pdev->dev, "hdmi_vic=%d\n", hdmi_rx->hdmi_vic);
+	}
 
-    /* Extended resolution format */
-    if (((buf[HDMI_VIDEO_FORMAT] >> HDMI_VIDEO_FORMAT_SHIFT ) & HDMI_VIDEO_FORMAT_MASK) 
-            == HDMI_VIDEO_FORMAT_EXTENDED_RESOLUTION) {
-	    hdmi_rx->hdmi_vic = buf[HDMI_VIC];
-	    dev_info(&hdmi_rx->pdev->dev, "hdmi_vic=%d\n",
-		     hdmi_rx->hdmi_vic);
-	    switch(hdmi_rx->hdmi_vic) {
-	    case 1:
-		    hdmi_rx->vic_code = 95;
-		    break;
-	    case 2:
-		    hdmi_rx->vic_code = 94;
-		    break;
-	    case 3:
-		    hdmi_rx->vic_code = 93;
-		    break;
-	    case 4:
-		    hdmi_rx->vic_code = 98;
-		    break;
-	    default:
-		    dev_err(&hdmi_rx->pdev->dev,
-			    "Error Vendor Infoframe HDMI_VIC %d not supported\n",
-			    hdmi_rx->hdmi_vic);
-		    hdmi_rx->vic_code = 0;
-	    }
-    }   
-    else if (((buf[HDMI_VIDEO_FORMAT] >> HDMI_VIDEO_FORMAT_SHIFT ) & HDMI_VIDEO_FORMAT_MASK)
-                == HDMI_VIDEO_FORMAT_3D_FORMAT) {
-            dev_err(&hdmi_rx->pdev->dev,
-			    "Error Vendor Infoframe 3D Format not supported\n");
-    }
 	return 0;
 }
 
@@ -479,9 +428,10 @@ int hdmirx_config(state_struct *state)
 	tmds_bit_clock_ratio_t tmds_bit_clock_ratio;
 	u8 sts;
 	int ret;
-	uint32_t events;
-	
-	
+	time_t timeout;
+	GENERAL_Read_Register_response resp;
+
+
 	/* First check to see if PHY is in reset, if so we need to
 	   do pma_config then arc_config */
 	if (phy_in_reset(state)) {
@@ -499,19 +449,23 @@ int hdmirx_config(state_struct *state)
 		/* init ARC */
 		arc_config(state);
 
-		/* Don't care about this initial status read, just clearing it out first 
+		/* Don't care about this initial status read, just clearing it out first
 		   before triggering HPD...
 		*/
+		{
+		uint32_t events;
+		msleep(200);
 		cdn_apb_read(state,SW_EVENTS1<<2,&events);
 		hdmirx_hotplug_trigger(state);
 		hdmirx_wait_edid_read(state);
-		msleep(2000);
+		mdelay(200);
+		}
 
 	} else {
 		pr_info("Prepare for rate change\n");
 		pre_data_rate_change(state);
 	}
-	
+
 	/* Detect rx clk signal */
 	if (pma_rx_clk_signal_detect(state)) {
 		dev_err(&hdmi_rx->pdev->dev, "Common rx_clk signal detect failed\n");
@@ -519,9 +473,8 @@ int hdmirx_config(state_struct *state)
 	} else {
 		dev_info(&hdmi_rx->pdev->dev, "pma_rx_clk_signal detected\n");
 	}
-	
-	
-	
+
+
 	/* Get TMDS_Bit_Clock_Ratio and Scrambling setting */
 	CDN_API_HDMIRX_GET_SCDC_SLAVE_blocking(state, scdcData);
 	tmds_bit_clock_ratio = ((scdcData->TMDS_Config & (1 << 1)) >> 1) ?
@@ -559,21 +512,13 @@ int hdmirx_config(state_struct *state)
 		return -1;
 	}
 
-
-	CDN_API_MainControl_blocking(state, 0x40, &sts);
-	pr_info("%s(): called CDN_API_MainControl_blocking(0x40)\n",
-		__func__);
-	CDN_API_MainControl_blocking(state, 1, &sts);
-	pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
-		__func__);
-	
 	/* Setup the scrambling mode */
 	CDN_API_General_Write_Register_blocking(state,
 						ADDR_SINK_MHL_HD + (TMDS_SCR_CTRL << 2),
 						F_SCRAMBLER_MODE(scrambling_en));
 	dev_info(&hdmi_rx->pdev->dev,
 				"Scrambling %s.\n", (scrambling_en) ? "enabled" : "disabled");
-				
+
 	/*Just to initiate the counters: */
 	CDN_API_General_Write_Register_blocking(state,
 						ADDR_SINK_MHL_HD + (TMDS_SCR_CNT_INT_CTRL << 2),
@@ -583,6 +528,42 @@ int hdmirx_config(state_struct *state)
 						ADDR_SINK_MHL_HD + (TMDS_SCR_VALID_CTRL << 2),
 						F_SCRAMBLER_SSCP_LINE_VALID_THR(1) |
 						F_SCRAMBLER_CTRL_LINE_VALID_THR(0));
+
+	/* Clear the TMDS decoder */
+	CDN_API_General_Write_Register_blocking(state,
+						ADDR_SINK_MHL_HD + (TMDS_DEC_CTRL << 2),
+						F_DECODER_ERR_CORR_EN(1) |
+						F_TMDS_DECODER_SW_RST(1));
+
+	/* Read to clear register for status */
+	CDN_API_General_Read_Register_blocking(
+					state,
+					ADDR_SINK_MHL_HD + (TMDS_DEC_ST << 2),
+					&resp);
+
+	CDN_API_General_Write_Register_blocking(state,
+						ADDR_SINK_MHL_HD + (TMDS_DEC_CTRL << 2),
+						F_DECODER_ERR_CORR_EN(1) |
+						F_TMDS_DECODER_SW_RST(0));
+
+	/* Wait for lock to TMDS datastream before continuing...*/
+	timeout = ktime_timeout_ms(50);
+	do {
+		CDN_API_General_Read_Register_blocking(
+					state,
+					ADDR_SINK_MHL_HD + (TMDS_DEC_ST << 2),
+					&resp);
+		pr_info("Got TMDS_DEC_ST: 0x%08X\n",resp.val);
+
+		if (ktime_after(ktime_get(), timeout)) {
+			dev_err(&hdmi_rx->pdev->dev, "Timeout locking to TMDS datastream\n");
+			return -1;
+		}
+	} while ((resp.val & 0x200) == 0);
+
+	/* Do post PHY programming settings */
+	CDN_API_MainControl_blocking(state, 0x80, &sts);
+	pr_info("CDN_API_MainControl_blocking() Initial Stage 2 complete.\n");
 
 	/* The PHY got programmed with the assumed TMDS/pixel clock ratio of 1:1.
 	 * Implement the link training procedure to find out the real clock ratio:
@@ -623,31 +604,18 @@ int hdmirx_config(state_struct *state)
 				"TMDS/pixel clock ratio mismatch detected (programmed: %0d, detected: %0d)\n",
 				clk_ratio, clk_ratio_detected);
 
+		CDN_API_MainControl_blocking(state, 0x40, &sts);
+		pr_info("%s(): called CDN_API_MainControl_blocking(0x40)\n",
+			__func__);
+		CDN_API_MainControl_blocking(state, 1, &sts);
+		pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
+			__func__);
+
 		/* Reconfigure the PHY */
 		dev_info(&hdmi_rx->pdev->dev, "Prepare to change rate\n");
 		pre_data_rate_change(state);
 
-		if (pma_cmn_ready(state) < 0) {
-			dev_err(&hdmi_rx->pdev->dev, "pma_cmn_ready failed\n");
-			return -1;
-		}
-
-		if (pma_rx_clk_signal_detect(state)) {
-			dev_err(&hdmi_rx->pdev->dev, "Common rx_clk signal detect failed\n");
-			return -1;
-		} else {
-			dev_info(&hdmi_rx->pdev->dev, "pma_rx_clk_signal detected\n");
-		}
-
-		/* Get TMDS clock frequency */
-		hdmi_rx->tmds_clk = hdmirx_get_stable_tmds(state);
-		if (hdmi_rx->tmds_clk <= 0) {
-			dev_err(&hdmi_rx->pdev->dev, "detect tmds clock failed\n");
-			return -1;
-		}
-		dev_info(&hdmi_rx->pdev->dev, "detect TMDS clock freq: %d kHz\n",
-		hdmi_rx->tmds_clk);
-
+		/* Re-use last measured TMDS frequency... */
 		ret = pma_pll_config(state, hdmi_rx->tmds_clk, clk_ratio_detected,
 			       tmds_bit_clock_ratio, data_rate_change);
 		if (ret < 0) {
@@ -655,14 +623,9 @@ int hdmirx_config(state_struct *state)
 			return -1;
 		}
 
-
-		CDN_API_MainControl_blocking(state, 0x40, &sts);
-		pr_info("%s(): called CDN_API_MainControl_blocking(0x40)\n",
-			__func__);
-		CDN_API_MainControl_blocking(state, 1, &sts);
-		pr_info("%s(): called CDN_API_MainControl_blocking(1)\n",
-			__func__);
-	
+		/* Do post PHY programming settings */
+		CDN_API_MainControl_blocking(state, 0x80, &sts);
+		pr_info("CDN_API_MainControl_blocking() Stage 2 complete.\n");
 	} else
 		dev_info(&hdmi_rx->pdev->dev, "TMDS/pixel clock ratio correct\n");
 
@@ -686,13 +649,6 @@ int hdmirx_config(state_struct *state)
 			break;
 		default:
 			dev_err(&hdmi_rx->pdev->dev, "Unknow color format\n");
-	}
-
-	{
-	u8 sts;
-	/* Do post PHY programming settings */
-	CDN_API_MainControl_blocking(state, 0x80, &sts);
-	pr_info("CDN_API_MainControl_blocking() Stage 2 complete.\n");
 	}
 
 	return 0;

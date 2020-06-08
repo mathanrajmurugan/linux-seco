@@ -139,6 +139,8 @@ struct mxc_hdmi_rx_dev {
 	u32 last_avi;
 	u8 avi[13];
 	bool initialized;
+
+	u8 last_5v_state;
 };
 
 enum mxc_hdmi_rx_power_state {
@@ -167,5 +169,6 @@ void hdmirx_hdcp_enable(state_struct *state);
 void hdmirx_hdcp_disable(state_struct *state);
 int hdmirx_hdcp_get_status(state_struct *state,
 			   CDN_API_HDCPRX_Status *hdcp_status);
+int hdmirx_hdcp_request_reauthentication(state_struct *state);
 int hdmirx_wait_edid_read(state_struct *state);
 #endif

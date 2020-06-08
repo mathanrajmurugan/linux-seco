@@ -1,0 +1,66 @@
+/*
+ * Copyright 2017 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx8mq-evk","fsl,seco-imx8mq-c12", "fsl,imx8mq"; 
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               WiFi		                              |
+ * |__________________________________________________________________________|
+ */
+
+
+    	fragment@0 {
+        	target = <&usdhc2>;
+        	__overlay__ {
+			pinctrl-names = "default", "state_100mhz", "state_200mhz";
+			pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>,<&pinctrl_wlan>;
+			/delete-property/ cd-gpios;
+			non-removable;
+			cap-power-off-card;
+			keep-power-in-suspend;
+			vmmc-supply = <&reg_wlan_en>;
+			status = "okay";
+
+			wlcore: wlcore@0 {
+				status = "okay";
+			};
+		};
+	};
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                             BLUETOOTH                                    |
+ * |__________________________________________________________________________|
+ */
+
+	 fragment@1 {
+                target-path = "/";
+                __overlay__  {
+			kim { 
+				compatible = "kim";
+				nshutdown_gpio = "null";
+				dev_name = "/dev/ttymxc3";
+				flow_cntrl = <1>;
+				baud_rate = <1000000>;
+			};
+
+		};
+	};
+};
+

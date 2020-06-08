@@ -52,11 +52,13 @@
 #define ktime_timeout_ms(ms_) ktime_add(ktime_get(), ms_to_ktime(ms_))
 
 #define PMA_CMN_READY_TIMEOUT_MS 5
-#define PMA_RX_CLK_SIGNAL_DETECT_TIMEOUT_MS 10
-#define PMA_RX_CLK_FREQ_DETECT_TIMEOUT_MS 10
+#define PMA_RX_CLK_SIGNAL_DETECT_TIMEOUT_MS 200
+#define PMA_RX_CLK_FREQ_DETECT_TIMEOUT_MS 5
 #define PMA_RX_CLK_FREQ_DETECT_MIN_THRESH 24000
+#define PMA_RX_CLK_FREQ_DETECT_MAX_THRESH 340000
+#define PMA_POWER_CHNG_TIMEOUT_MS 100
 #define TMDS_STABLE_DETECT_COUNT_THRESHOLD 3
-#define TMDS_STABLE_DETECT_TIMEOUT_MS 2000
+#define TMDS_STABLE_DETECT_TIMEOUT_MS 500
 
 static inline void write16(state_struct *state, u32 addr, u16 val)
 {
@@ -108,39 +110,39 @@ void arc_config(state_struct *state)
 	u16 reg_val;
 
 	write16(state, TXDA_CYA_AUXDA_CYA_ADDR, 0x0001);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_DIG_CTRL_REG_1_ADDR, 0x3);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_DIG_CTRL_REG_2_ADDR, 0x0024);
-	msleep(1);
+	udelay(1);
 
 	reg_val = read16(state, TX_ANA_CTRL_REG_1_ADDR);
 	reg_val |= 0x2000;
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, reg_val);
-	msleep(1);
+	udelay(1);
 
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x0100);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x0300);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_3_ADDR, 0x0000);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2008);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2018);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2098);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030C);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_5_ADDR, 0x0010);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_4_ADDR, 0x4001);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_1_ADDR, 0x2198);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030D);
-	msleep(1);
+	udelay(1);
 	write16(state, TX_ANA_CTRL_REG_2_ADDR, 0x030F);
 }
 
@@ -196,19 +198,16 @@ void pre_data_rate_change(state_struct *state)
 	int i;
 	int ret_val;
 	const time_t timeout = ktime_timeout_ms(1500);
-	
-	reg_val = read16(state, PHY_PMA_CMN_CTRL2_ADDR);
-	pr_info("PHY_PMA_CMN_CTRL2_ADDR: 0x%04X\n",reg_val);
-	
+
 	/* Turn off frequency measurement: */
 	write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR, 0x0000);
-	
+
 	/* Request A3 power state */
-	/* This doesn't seem to work properly, if a reset is applied 
-	   with the PHY in A3 it seems to hang?
+	/* Can only really do this if PHY already in A0 state, all other
+	   times are meaningless and can cause issues if PLL not running...
 	*/
 	reg_val = read16(state, PHY_MODE_CTL_ADDR);
-	if (reg_val & 0x00F0) {
+	if ((reg_val & 0x00F0) == 0x0010) {
 		ret_val = pma_power_state_chng(state,0x8);
 		pr_info("Shutting down PLL\n");
 		write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xEF00);
@@ -223,22 +222,19 @@ void pre_data_rate_change(state_struct *state)
 		} while ((reg_val & 0x0004) == 0x0000);
 	} else {
 		pr_info("Skipping A3 power change since PHY_MODE_CTL: 0x%04X\n",reg_val);
-		pr_info("Assuming PHY just out of reset\n");
 	}
-	
+
 	/* Clear power state and set transceiver resets active */
 	write16(state, PHY_MODE_CTL_ADDR, 0x0000);
-	
+
 	/* Setting PMA Transceiver Control for each lane to default */
 	for (i = 0; i < 3; i++) {
 		reg_val = 0x0C61;
 		write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6), reg_val);
 	}
 
-	reg_val = read16(state, PHY_PMA_CMN_CTRL2_ADDR);
-	pr_info("PHY_PMA_CMN_CTRL2_ADDR: 0x%04X\n",reg_val);
-	
-	pr_info("pre_data_rate_change() Finished successfully\n");
+	/* De-assert PHY reset in case we applied it earlier due to timeout...*/
+	imx8qm_hdmi_phy_reset(state, 1);
 }
 
 int pma_cmn_ready(state_struct *state)
@@ -246,9 +242,9 @@ int pma_cmn_ready(state_struct *state)
 	const time_t timeout = ktime_timeout_ms(PMA_CMN_READY_TIMEOUT_MS);
 
 	do {
+		udelay(10);
 		if (read16(state, PHY_PMA_CMN_CTRL1_ADDR) & (1 << 0))
 			return 0;
-		msleep(1);
 	} while (ktime_before(ktime_get(), timeout));
 
 	pr_info("%s timeout\n", __func__);
@@ -307,7 +303,7 @@ int pma_rx_clk_freq_detect(state_struct *state)
 
 	/* Turn off frequency measurement: */
 	write16(state, CMN_CMSMT_CLK_FREQ_MSMT_CTRL_ADDR, 0x0000);
-	
+
 	return rx_clk_freq;
 }
 
@@ -318,7 +314,7 @@ int hdmirx_get_stable_tmds(state_struct *state)
 	char i = 0;
 
 /*	pr_info("MEASURING TMDS\n");*/
-	
+
 	int tmds = -1;
 	do {
 		int val;
@@ -327,8 +323,6 @@ int hdmirx_get_stable_tmds(state_struct *state)
 			pr_info("TMDS Monitor cleanup in progress...\n");
 			return -1;
 		}
-		
-		mdelay(5);
 
 		val = pma_rx_clk_freq_detect(state);
 		if ((tmds < (val + 50)) && (tmds > (val - 50))) {
@@ -340,14 +334,20 @@ int hdmirx_get_stable_tmds(state_struct *state)
 
 		if (i == TMDS_STABLE_DETECT_COUNT_THRESHOLD) {
 /*			pr_info("DONE MEASURING TMDS, got %d\n",tmds);*/
-			if ((tmds < PMA_RX_CLK_FREQ_DETECT_MIN_THRESH) && (tmds >= 0)) {
-				pr_info("hdmirx_get_stable_tmds() measured value not valid %d\n",tmds);
-				return -1;
-			}
-			return tmds; /* Can be -1 */
+			if (((tmds < PMA_RX_CLK_FREQ_DETECT_MIN_THRESH) && (tmds >= 0)) ||
+			     (tmds > PMA_RX_CLK_FREQ_DETECT_MAX_THRESH)) {
+				pr_info("hdmirx_get_stable_tmds() measured value not valid %d, will try again after 100ms\n",tmds);
+				i = 0;
+				tmds = 0;
+				mdelay(100);	/* Give source some settling time */
+			} else
+				return tmds; /* Can be -1 */
 		}
+
+		udelay(10);
+
 	} while (ktime_before(ktime_get(), timeout));
-	
+
 	/*pr_info("hdmirx_get_stable_tmds() timeout\n");*/
 	return -1;
 }
@@ -357,7 +357,7 @@ int pma_power_state_chng(state_struct *state, u8 power_state)
 	u16 reg_val;
 	reg_field_t xcvr_power_state_req;
 	reg_field_t xcvr_power_state_ack;
-	const time_t timeout = ktime_timeout_ms(100);
+	time_t timeout;
 
 	xcvr_power_state_req.label = "xcvr_power_state_req";
 	xcvr_power_state_ack.label = "xcvr_power_state_ack";
@@ -367,38 +367,35 @@ int pma_power_state_chng(state_struct *state, u8 power_state)
 	xcvr_power_state_ack.lsb = 4;
 	set_field_value(&xcvr_power_state_req, power_state);
 	set_field_value(&xcvr_power_state_ack, power_state);
-	
+
 	/* Get current power state: */
 	/* PHY_MODE_CTL */
 	reg_val = read16(state, PHY_MODE_CTL_ADDR);
 	pr_info("pma_power_state_chng() PHY_MODE_CTL: 0x%04X\n",reg_val);
-	pr_info("pma_power_state_chng() Current power state: 0x%02X\n", ((reg_val & 0x00F0)>> 4));
-	
+
 	reg_val &= 0xFFF0;
 	reg_val |= set_reg_value(xcvr_power_state_req);
 
 	write16(state, PHY_MODE_CTL_ADDR, reg_val);
-	pr_info("pma_power_state_chng() Writing PHY_MODE_CTL: 0x%04X\n",reg_val);
 	pr_info("pma_power_state_chng() Requested power mode 0x%02X\n",power_state);
-	
+
 	/* Wait for power mode acknowledged: */
 	/* PHY_MODE_CTL */
-
+	timeout = ktime_timeout_ms(PMA_POWER_CHNG_TIMEOUT_MS);
 	do {
-		msleep(1);
-		if (ktime_after(ktime_get(), timeout)) {
-			pr_info("pma_power_state_chng() Timed out with PHY_MODE_CTL: 0x%04X\n",reg_val);
-			write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xFFF0);
-			return -1;
-		}
+		udelay(5);
 		reg_val = read16(state, PHY_MODE_CTL_ADDR);
+		if ((reg_val & 0x00F0) == set_reg_value(xcvr_power_state_ack)) {
+			write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xFFF0);
+			pr_info("pma_power_state_chng() Done with PHY_MODE_CTL: 0x%04X\n",reg_val);
+			return 0;
+		}
 
-	} while ((reg_val & 0x00F0) != set_reg_value(xcvr_power_state_ack));
-	
+	} while (ktime_before(ktime_get(), timeout));
+
+	pr_info("pma_power_state_chng() Timed out with PHY_MODE_CTL: 0x%04X\n",reg_val);
 	write16(state, PHY_MODE_CTL_ADDR, reg_val & 0xFFF0);
-	pr_info("pma_power_state_chng() Done with PHY_MODE_CTL: 0x%04X\n",reg_val);
-	
-	return 0;
+	return -1;
 }
 
 int pma_pll_config(state_struct *state,
@@ -1202,10 +1199,9 @@ int pma_pll_config(state_struct *state,
 	/* Wait for PLL0 ready: */
 	/* PHY_PMA_CMN_CTRL2 */
 	do {
-		msleep(1);
 		if (ktime_after(ktime_get(), timeout))
 			goto timeout_err;
-
+		udelay(10);
 	} while ((read16(state, PHY_PMA_CMN_CTRL2_ADDR) & (1 << 0)) == 0);
 
 	/* Turn on output clocks: */
@@ -1215,20 +1211,19 @@ int pma_pll_config(state_struct *state,
 	reg_val |= set_reg_value(iso_pma_cmn_pll0_clk_en);
 	write16(state, PHY_PMA_CMN_CTRL2_ADDR, reg_val);
 
-/*	if (data_rate_change) {*/
-		pr_info("pma_pll_config() Disable Rx Eq Training\n");
-		for (i = 0; i < 3; i++) {
-			reg_val =
-			    read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6));
-			reg_val &= 0xFFEF;
-			write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6), reg_val);
-		}
-/*	}*/
+	pr_info("pma_pll_config() Disable Rx Eq Training\n");
+	for (i = 0; i < 3; i++) {
+		reg_val =
+		    read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6));
+		reg_val &= 0xFFEF;
+		write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6), reg_val);
+	}
+
 	/* Get current power state: */
 	/* PHY_MODE_CTL */
 	reg_val = read16(state, PHY_MODE_CTL_ADDR);
 	pr_info("pma_pll_config() PHY_MODE_CTL: 0x%04X\n",reg_val);
-	
+
 	reg_val &= 0x00F0;
 	pr_info("pma_pll_config() Current power state: 0x%02X\n", (reg_val >> 4));
 
@@ -1246,29 +1241,27 @@ int pma_pll_config(state_struct *state,
 		reg_val = (1 << 13);
 		if (ktime_after(ktime_get(), timeout))
 			goto timeout_err;
+
 		for (i = 0; i < 3; i++) {
 			reg_val &= read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6)) & (1 << 13);
 			pr_info("pma_pll_config() xcvr_psm_ready(%0d): 0x%0X\n", i, reg_val >> 13);
 		}
-		msleep(1);
 	} while (!reg_val && loop < 20);
 
 	/* Set A0 power state: */
 	/* PHY_MODE_CTL */
 	if (pma_power_state_chng(state,0x1))
 		goto timeout_err;
-	
 
-/*	if (data_rate_change) {*/
-		pr_info("pma_pll_config() Enable Rx Eq Training\n");
-		for (i = 0; i < 3; i++) {
-			reg_val =
-			    read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6));
-			reg_val |= 0x0010;
-			write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6),
-				reg_val);
-		}
-/*	}*/
+
+	pr_info("pma_pll_config() Enable Rx Eq Training\n");
+	for (i = 0; i < 3; i++) {
+		reg_val =
+		    read16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6));
+		reg_val |= 0x0010;
+		write16(state, PHY_PMA_XCVR_CTRL_ADDR | (i << 6),
+			reg_val);
+	}
 
 	return 0;
 

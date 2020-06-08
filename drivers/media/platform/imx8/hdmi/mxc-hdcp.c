@@ -20,6 +20,7 @@
 
 void hdmirx_hdcp_enable(state_struct *state)
 {
+    int ret;
 	int version =
 		/*CDN_API_HDCP_REC_VERSION_BOTH;*/
 		/*CDN_API_HDCP_REC_VERSION_1;*/
@@ -37,20 +38,43 @@ void hdmirx_hdcp_enable(state_struct *state)
 	config.bcaps = 0x80;
 	config.bstatus = 0x1000; /* HDMI mode */
 
-	/* This is currently handled by the SECO
-	 * CDN_API_HDCPRX_SetConfiguration_blocking(state, 4, &config,
-	 *					    CDN_BUS_TYPE_APB);
-	 */
+	// This was handled by the SECO
+	ret=CDN_API_HDCPRX_SetConfig_blocking(state,&config,
+						    CDN_BUS_TYPE_APB);
+	if (ret != CDN_OK) {
+        pr_info("%s(), could not enable the HDCP\n", __func__);
+    }
+
 
 }
 
 void hdmirx_hdcp_disable(state_struct *state)
 {
+	  //This is currently handled by the SECO
+	  //hdmirx_hdcp_set(state, 0, CDN_API_HDCPRX_VERSION_2);
+
+    int ret;
+    int version = CDN_API_HDCPRX_VERSION_2;
+
+	CDN_API_HDCPRX_Config config = { 0 };
+
 	pr_info("%s()\n", __func__);
 
-	/* This is currently handled by the SECO
-	 * hdmirx_hdcp_set(state, 0, CDN_API_HDCPRX_VERSION_2);
-	 */
+	config.activate = 0;
+	config.version = version;
+	config.repeater = 0;
+	config.use_secondary_link = 0;
+	config.use_km_key = 0;
+	config.bcaps = 0x00;
+	config.bstatus = 0x1000; /* HDMI mode */
+
+	// This was handled by the SECO
+	ret=CDN_API_HDCPRX_SetConfig_blocking(state, &config,
+						    CDN_BUS_TYPE_APB);
+    if (ret != CDN_OK) {
+        pr_info("%s(), could not disable the HDCP\n", __func__);
+    }
+
 }
 
 int hdmirx_hdcp_get_status(state_struct *state,
@@ -58,25 +82,41 @@ int hdmirx_hdcp_get_status(state_struct *state,
 {
 	/* todo: implement HDCP status checking if needed */
 
-	/*
-	 * pr_info("%s()\n", __func__);
-	 * CDN_API_HDCPRX_GetStatus(state,
-	 * memset(hdcp_status, 0, sizeof(CDN_API_HDCPRX_Status));
-	 *
-	 * CDN_API_HDCP_REC_GetStatus(state,
-	 *                            hdcp_status,
-	 *                            CDN_BUS_TYPE_APB);
-	 *
-	 * pr_info("HCDP key_arrived 0x%02x\n", hdcp_status->key_arrived);
-	 * pr_info("HCDP hdcp_ver    0x%02x\n", hdcp_status->hdcp_ver);
-	 * pr_info("HCDP error       0x%02x\n", hdcp_status->error);
-	 * pr_info("HCDP aksv[] 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-	 *         hdcp_status->aksv[0],
-	 *         hdcp_status->aksv[1],
-	 *         hdcp_status->aksv[2],
-	 *         hdcp_status->aksv[3],
-	 *         hdcp_status->aksv[4]);
-	 * pr_info("HCDP ainfo      0x%02x\n", hdcp_status->ainfo);
-	 */
-	return 0;
+	  int ret;
+	  pr_info("%s()\n", __func__);
+	  memset(hdcp_status, 0, sizeof(CDN_API_HDCPRX_Status));
+
+	  ret=CDN_API_HDCPRX_GetStatus_blocking(state,
+						hdcp_status,
+						CDN_BUS_TYPE_APB);
+	  if (ret == CDN_OK) {
+	      pr_info("HCDP key_arrived 0x%02x\n", hdcp_status->key_arrived);
+	      pr_info("HCDP hdcp_ver    0x%02x\n", hdcp_status->hdcp_ver);
+	      pr_info("HCDP error       0x%02x\n", hdcp_status->error);
+	      pr_info("HCDP aksv[] 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+	              hdcp_status->aksv[0],
+	              hdcp_status->aksv[1],
+	              hdcp_status->aksv[2],
+	              hdcp_status->aksv[3],
+	              hdcp_status->aksv[4]);
+	      pr_info("HCDP ainfo      0x%02x\n", hdcp_status->ainfo);
+      }
+
+	return ret;
+}
+
+
+
+int hdmirx_hdcp_request_reauthentication(state_struct *state)
+{
+    int ret;
+
+	pr_info("%s()\n", __func__);
+
+    ret=CDN_API_HDCPRX_NotSync_blocking(state,CDN_BUS_TYPE_APB);
+
+	if (ret != CDN_OK) {
+        pr_info("%s(), could request reauthentication the HDCP\n", __func__);
+    }
+	return ret;
 }

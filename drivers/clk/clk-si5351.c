@@ -81,6 +81,45 @@ static const char * const si5351_clkout_names[] = {
 	"clk0", "clk1", "clk2", "clk3", "clk4", "clk5", "clk6", "clk7"
 };
 
+typedef struct {
+	unsigned char address; /* 16-bit register address */
+	unsigned char value; /* 8-bit register data */
+} si5351_register_t;
+
+static const si5351_register_t	si5351_spread_spectrum_0_15[] = {
+	{ 0x0095, 0x84 },
+	{ 0x0096, 0x76 },
+	{ 0x0097, 0xFF },
+	{ 0x0098, 0xFF },
+	{ 0x0099, 0x00 },
+	{ 0x009A, 0x00 },
+	{ 0x009B, 0xC6 },
+	{ 0x009C, 0x04 },
+	{ 0x009D, 0x79 },
+	{ 0x009E, 0x7F },
+	{ 0x009F, 0xFF },
+	{ 0x00A0, 0x00 },
+	{ 0x00A1, 0x00 },
+	{ 0x00A2, 0x00 },
+};
+
+static const si5351_register_t	si5351_spread_spectrum_1_5[] = {
+	{ 0x0095, 0xAC },
+	{ 0x0096, 0x05 },
+	{ 0x0097, 0xFF },
+	{ 0x0098, 0xFF },
+	{ 0x0099, 0x00 },
+	{ 0x009A, 0x00 },
+	{ 0x009B, 0xC6 },
+	{ 0x009C, 0x2D },
+	{ 0x009D, 0x5C },
+	{ 0x009E, 0x7F },
+	{ 0x009F, 0xFF },
+	{ 0x00A0, 0x00 },
+	{ 0x00A1, 0x00 },
+	{ 0x00A2, 0x00 },
+};
+
 /*
  * Si5351 i2c regmap
  */
@@ -1329,6 +1368,11 @@ static int si5351_dt_parse(struct i2c_client *client,
 
 		pdata->clkout[num].pll_reset =
 			of_property_read_bool(child, "silabs,pll-reset");
+	
+		pdata->clkout[num].pll_spread_0_15 =
+			of_property_read_bool(child, "silabs,pll-spread_spectrum-0_15");
+		pdata->clkout[num].pll_spread_1_5 =
+			of_property_read_bool(child, "silabs,pll-spread_spectrum-1_5");
 	}
 	client->dev.platform_data = pdata;
 
@@ -1373,7 +1417,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
 	struct clk_init_data init;
 	const char *parent_names[4];
 	u8 num_parents, num_clocks;
-	int ret, n;
+	int ret, n, i;
 
 	ret = si5351_dt_parse(client, variant);
 	if (ret)
@@ -1634,6 +1678,27 @@ static int si5351_i2c_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(&client->dev, "unable to add clk provider\n");
 		return ret;
+	}
+
+	/* Configure Spread Spectrum */
+	for (n = 0; n < num_clocks; n++) {
+		if(pdata->clkout[n].pll_spread_0_15) {
+			dev_info(&client->dev, "Configuring spread spectrum 0.15\n");
+			for( i=0; i < sizeof(si5351_spread_spectrum_0_15)/sizeof(si5351_register_t); i++ ) {
+				ret = si5351_reg_write(drvdata,si5351_spread_spectrum_0_15[i].address, si5351_spread_spectrum_0_15[i].value);
+				if(ret)
+					dev_err(&client->dev, "unable to configure spread spectrum\n"); 
+			}
+		}
+		if(pdata->clkout[n].pll_spread_1_5) {
+			dev_info(&client->dev, "Configuring spread spectrum 1.5\n");
+			for( i=0; i < sizeof(si5351_spread_spectrum_1_5)/sizeof(si5351_register_t); i++ ) {
+				ret = si5351_reg_write(drvdata,si5351_spread_spectrum_1_5[i].address, si5351_spread_spectrum_1_5[i].value);
+				if(ret)
+					dev_err(&client->dev, "unable to configure spread spectrum\n"); 
+			}
+		}
+
 	}
 
 	return 0;

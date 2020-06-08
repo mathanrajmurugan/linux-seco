@@ -21,6 +21,7 @@
 #include <linux/of.h>
 #include <linux/irq.h>
 #include <linux/of_device.h>
+#include <linux/regulator/consumer.h>
 
 #include "imx-hdp.h"
 #include "imx-hdmi.h"
@@ -1724,6 +1725,13 @@ static const struct component_ops imx_hdp_imx_ops = {
 
 static int imx_hdp_imx_probe(struct platform_device *pdev)
 {
+	struct regulator *hdmi_en;
+        /* Get HDMI en regulator and enable it*/
+        hdmi_en = devm_regulator_get(&pdev->dev, "osc_en");
+        if(!IS_ERR(hdmi_en))
+                if(regulator_enable(hdmi_en))
+                        dev_err(&pdev->dev, "error enabling hdmi regualator\n");
+
 	return component_add(&pdev->dev, &imx_hdp_imx_ops);
 }
 

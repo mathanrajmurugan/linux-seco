@@ -1452,6 +1452,45 @@ static const struct panel_desc innolux_n140hca = {
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,//MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
+static const struct display_timing auo_p215hca_timing = {
+        .pixelclock = { 141000000, 160000000, 165000000 },
+        .hactive = { 1920, 1920, 1920 },
+        .hfront_porch = { 1, 40, 90 },
+        .hsync_len = { 1, 10, 45 },
+        .hback_porch = { 1, 40, 150 },
+        .vactive = { 1080, 1080, 1080 },
+        .vfront_porch = { 3, 20, 50 },
+        .vsync_len = { 6, 10,60  },
+        .vback_porch = { 11, 20, 37 },
+        .flags = DISPLAY_FLAGS_HSYNC_LOW |
+                   DISPLAY_FLAGS_VSYNC_LOW |
+                   DISPLAY_FLAGS_DE_LOW |
+                   DISPLAY_FLAGS_PIXDATA_NEGEDGE,
+};
+
+static const struct panel_desc auo_p215hca = {
+        .timings = &auo_p215hca_timing,
+        .num_timings = 1,
+        .bpc = 8,
+        .size = {
+                .width = 68,
+                .height = 121,
+        },
+        .delay = {
+                /*
+                 * The panel spec recommends one second delay
+                 * to the below items.  However, it's a bit too
+                 * long in pratical.  Based on tests, it turns
+                 * out 100 milliseconds is fine.
+                 */
+                .prepare = 100,
+                .enable = 100,
+                .unprepare = 100,
+                .disable = 100,
+        },
+        .bus_format = MEDIA_BUS_FMT_RGB888_1X24,//MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+};
+
 static const struct display_timing jdi_tx26d202vm0bwa_timing = {
 	.pixelclock = { 151820000, 156720000, 159780000 },
 	.hactive = { 1920, 1920, 1920 },
@@ -2534,6 +2573,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
                 .compatible = "innolux,n140hca",
                 .data = &innolux_n140hca,
+	}, {
+                .compatible = "auo,p215hca",
+                .data = &auo_p215hca,
         }, {
 		.compatible = "kyo,tcg121xglp",
 		.data = &kyo_tcg121xglp,

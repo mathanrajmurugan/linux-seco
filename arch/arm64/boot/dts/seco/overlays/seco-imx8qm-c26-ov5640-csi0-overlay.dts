@@ -88,4 +88,33 @@
 			};
 		};
 	};
+
+        fragment@5 {
+                target = <&gpio2>;
+                __overlay__ {
+                        status = "okay";
+                    line_b@0 {
+                        gpio-hog;
+                        gpios = <25 0>;
+                        output-high;
+                        line-name = "HDMI_SEL1";
+                        };
+
+                    line_b@1 {
+                        gpio-hog;
+                        gpios = <26 0>;
+                        output-high;
+                        line-name = "HDMI_SEL2";
+                        };
+
+                    line_b@2 {
+                        gpio-hog;
+                        gpios = <27 0>;
+                        output-high;
+                        line-name = "HDMI_IN_EN";
+                        };
+
+                };
+        };
+
 };

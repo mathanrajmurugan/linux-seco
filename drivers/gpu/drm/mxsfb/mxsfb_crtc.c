@@ -341,10 +341,15 @@ static dma_addr_t mxsfb_get_fb_paddr(struct mxsfb_drm_private *mxsfb)
 static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
 {
 	struct drm_display_mode *m = &mxsfb->pipe.crtc.state->adjusted_mode;
-	const u32 bus_flags = mxsfb->connector->display_info.bus_flags;
+	u32 bus_flags = mxsfb->connector->display_info.bus_flags;
 	u32 vdctrl0, vsync_pulse_len, hsync_pulse_len;
 	int err;
-
+	
+	/* Configure a valid bus flags if not set */
+	if(!bus_flags) {
+		DRM_DEV_INFO(mxsfb->dev,"crtc bus flags not configured - init with bus_flags 0x9\n");
+		bus_flags = DRM_BUS_FLAG_DE_LOW | DRM_BUS_FLAG_PIXDATA_NEGEDGE; 
+	}
 	/*
 	 * It seems, you can't re-program the controller if it is still
 	 * running. This may lead to shifted pictures (FIFO issue?), so

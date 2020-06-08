@@ -266,9 +266,9 @@ CDN_API_HDCPRX_GetStatus(state_struct *state,
  * \brief blocking version of #CDN_API_HDCPRX_GetStatus
  */
 CDN_API_STATUS
-CDN_API_HDCPRX_GetStatus(state_struct *state,
-			 CDN_API_HDCPRX_Status *cfg,
-			 CDN_BUS_TYPE bus_type);
+CDN_API_HDCPRX_GetStatus_blocking(state_struct *state,
+				  CDN_API_HDCPRX_Status *cfg,
+				  CDN_BUS_TYPE bus_type);
 
 /**
  * \brief send HDCP_REC_NOT_SYNC command

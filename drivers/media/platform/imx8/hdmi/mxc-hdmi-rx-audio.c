@@ -37,7 +37,7 @@ static int get_audio_infoframe(state_struct *state, unsigned int *chan)
 	int ret = 0;
 	int times = 0;
 
-	cdn_apb_write(state, ADDR_SINK_PIF + (PKT_INFO_TYPE_CFG1 << 2), F_INFO_TYPE1(0x84));
+	cdn_apb_write(state, ADDR_SINK_PIF + (PKT_INFO_TYPE_CFG1 << 2), F_INFO_TYPE1(HDMI_INFOFRAME_TYPE_AUDIO));
 
 	cdn_apb_write(state, ADDR_SINK_PIF + (PKT_INT_MASK << 2), 0x1FFFE);
 
@@ -164,12 +164,18 @@ static int mxc_hdmi_rx_audio(struct mxc_hdmi_rx_dev *hdmi)
 	CDN_API_STATUS status;
 	int ret;
 
-        if(hdmi->initialized==false)
-                return -EINVAL;
+	if(hdmi->initialized != true )
+		return -EINVAL;
 
 	ret = get_audio_infoframe(state, &chan);
 	if (ret)
 		return ret;
+
+	if (chan == 1)
+	{
+		printk("%s %i - force channel number to 2\n", __func__, __LINE__);
+		chan = 2;
+	}
 
 	status = CDN_API_RX_AudioAutoConfig(state, chan, chan/2, 0, 32, 32);
 	if (status != CDN_OK)
@@ -182,6 +188,7 @@ static int mxc_hdmi_rx_audio(struct mxc_hdmi_rx_dev *hdmi)
 
 	hdmi->channels = chan;
 	hdmi->sample_rate = rate;
+	printk("HDMI RX audio configured for %i channels - rate %i - width %i\n", hdmi->channels, hdmi->sample_rate, hdmi->sample_width);
 
 	return 0;
 }

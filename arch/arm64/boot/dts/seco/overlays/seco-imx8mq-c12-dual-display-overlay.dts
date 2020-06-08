@@ -1,0 +1,132 @@
+/*
+ * Copyright 2017 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+        compatible = "fsl,imx8mq-evk","seco,seco-imx8mq-c12", "fsl,imx8mq";
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               WiFi                                       |
+ * |__________________________________________________________________________|
+ */
+
+
+        fragment@1 {
+                target = <&hdmi>;
+                __overlay__ {
+			status = "okay";
+		 };
+	};
+
+	fragment@3 {
+                target = <&ov5640_mipi>;
+                __overlay__ {
+                        status = "disabled";
+                 };
+        };
+
+	fragment@5 {
+                target = <&lcdif>;
+                __overlay__ {
+			status = "okay";
+			max-res = <1920>,<1080>;
+			//bits-per-pixel = <32>;
+			//bus-width = <24>;
+			port@0 {
+				lcdif_mipi_dsi: endpoint {
+					remote-endpoint = <&mipi_dsi_in>;
+	              		};
+			};
+		};
+        };	
+
+	fragment@6 {
+                target = <&panel_lvds>;
+                __overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+                        port@0 {
+                                reg = <0>;
+                                panel_in: endpoint {
+                                        remote-endpoint = <&bridge_to_panel>;
+                                };
+                        };
+
+                 };
+        };
+
+	fragment@7 {
+		target = <&adv_bridge>;
+                __overlay__ {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        lvds,datamap = "jeida";
+                        lvds,dual-channel;
+                        status = "okay";
+
+                        port@0 {
+				reg = <0>;
+                                sn65dsi84_in: endpoint {
+                                        remote-endpoint = <&mipi_dsi_bridge_adv>;
+                                };
+                        };
+
+			port@1 {
+				reg = <1>;
+				bridge_to_panel: endpoint {
+					remote-endpoint = <&panel_in>;
+				};
+			};
+                };
+	};
+
+	fragment@8 {
+                target = <&mipi_dsi_phy>;
+                __overlay__ {
+                        status = "okay";
+                 };
+        };
+	
+	fragment@9 {
+                target = <&mipi_dsi>;
+                __overlay__ {
+			status = "okay";
+			as_bridge;
+			sync-pol = <1>;
+			pwr-delay = <10>;
+
+			port@1 {
+				mipi_dsi_in: endpoint {
+					remote-endpoint = <&lcdif_mipi_dsi>;
+				};
+			};
+		};
+	};
+
+	fragment@10 {
+                target = <&mipi_dsi_bridge>;
+                __overlay__ {
+                        status = "okay";
+			port@1 {
+				mipi_dsi_bridge_adv: endpoint {
+					remote-endpoint = <&sn65dsi84_in>;
+				};
+			};
+		};
+        };
+};

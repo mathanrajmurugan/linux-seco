@@ -1,0 +1,42 @@
+/*
+ * Copyright 2017 NXP
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "fsl,imx8mq-evk","fsl,seco-imx8mq-c12", "fsl,imx8mq"; 
+
+/*  __________________________________________________________________________
+ * |                                                                          |
+ * |                               CAN RTC	                              |
+ * |__________________________________________________________________________|
+ */
+
+
+    	fragment@0 {
+        	target = <&ecspi1>;
+        	__overlay__ {
+
+			rtc: pcf2123@0 {
+				status = "okay";
+			};
+			
+			can_spi: mcp258x@1 {
+                                status = "okay";
+                        };
+		};
+	};
+};
+

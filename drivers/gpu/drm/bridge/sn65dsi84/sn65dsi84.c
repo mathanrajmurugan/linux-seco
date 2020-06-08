@@ -81,6 +81,8 @@ static bool sn65dsi84_videomode_parse_dt(struct device_node *np, struct sn65dsi8
 	adv->lvds_channel_reverse = of_property_read_bool(np, "lvds,channel-reverse");
 	adv->lvds_channel_swap = of_property_read_bool(np, "lvds,channel-swap");
 	adv->lvds_test_mode = of_property_read_bool(np, "lvds,test-mode");
+	adv->lvds_preserve_dsi_timings = of_property_read_bool(np, "lvds,preserve-dsi-timings");
+	if(of_property_read_u32(np, "dsi,mode-flags", &(adv->mode_flags)))  adv->mode_flags = MIPI_DSI_MODE_VIDEO;
 	return true;
 }
 
@@ -169,10 +171,10 @@ static void sn65dsi84_calculate_clk_div_mul( u8 *clk_div_mul, unsigned int dsi_c
 		return;
 	}
 	
-        i = (dsi_clk) / ((pixclk));
+	i = (dsi_clk + (pixclk/2)) / ((pixclk));
 
-        if( i != 0 && i <= 24 )
-                *clk_div_mul = (i<<3);
+        if( i >= 0 && i <= 26 )
+                *clk_div_mul = ((i-1)<<3);
 	return;	
 }
 
@@ -209,7 +211,10 @@ static void sn65dsi84_bridge_enable(struct drm_bridge *bridge)
 
 		val = 0;
 		/* Calculate Multiplier and Divider for generate LVDS Clock from DSI Clock */
-		sn65dsi84_calculate_clk_div_mul(&val,dsi_clock, (mode->clock)*1000);
+		if(pdata->lvds_dual_channel)
+			sn65dsi84_calculate_clk_div_mul(&val,dsi_clock, (mode->clock)*1000/2);
+		else
+			sn65dsi84_calculate_clk_div_mul(&val,dsi_clock, (mode->clock)*1000);
 
 	} else {
 		DRM_INFO("configuring for external oscillator\n");
@@ -289,19 +294,33 @@ static void sn65dsi84_bridge_enable(struct drm_bridge *bridge)
 	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_SYNC_DELAY_LOW, 0x0);
 	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_SYNC_DELAY_HIGH, 0x2);
 
-	/* HSYNC VSYNC width high/low */
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_LOW,	(mode->hsync_end - mode->hsync_start) & 0x00ff);
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_HIGH,(((mode->hsync_end - mode->hsync_start) >> 8) & 0x7F) | hsync_polarity);
-	
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_LOW,	(mode->vsync_end - mode->vsync_start) & 0xFF);
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_HIGH,(((mode->vsync_end - mode->vsync_start) >> 8) & 0x7F) | vsync_polarity);	
-
+	if(pdata->lvds_preserve_dsi_timings) {
+		/* HSYNC VSYNC width high/low */
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_LOW,	0);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_HIGH, 	0 | hsync_polarity);
 		
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_BACK_PORCH, (mode->htotal - mode->hsync_end) & 0xFF);
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_BACK_PORCH, (mode->vtotal - mode->vsync_end) & 0xFF);
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_FRONT_PORCH, (mode->hsync_start - mode->hdisplay) & 0xFF);
-	regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_FRONT_PORCH, (mode->vsync_start - mode->vdisplay) & 0xFF);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_LOW, 	0);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_HIGH,	0 | vsync_polarity);	
 
+			
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_BACK_PORCH,	0);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_BACK_PORCH,	0);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_FRONT_PORCH,	0);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_FRONT_PORCH,	0);
+	} else {
+		/* HSYNC VSYNC width high/low */
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_LOW,	(mode->hsync_end - mode->hsync_start) & 0x00ff);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HSYNC_PULSE_WIDTH_HIGH,(((mode->hsync_end - mode->hsync_start) >> 8) & 0x7F) | hsync_polarity);
+		
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_LOW,	(mode->vsync_end - mode->vsync_start) & 0xFF);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VSYNC_PULSE_WIDTH_HIGH,(((mode->vsync_end - mode->vsync_start) >> 8) & 0x7F) | vsync_polarity);	
+
+			
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_BACK_PORCH, (mode->htotal - mode->hsync_end) & 0xFF);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_BACK_PORCH, (mode->vtotal - mode->vsync_end) & 0xFF);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_HORIZONTAL_FRONT_PORCH, (mode->hsync_start - mode->hdisplay) & 0xFF);
+		regmap_write(pdata->regmap, SN65DSI84_REG_CHA_VERTICAL_FRONT_PORCH, (mode->vsync_start - mode->vdisplay) & 0xFF);
+	}
 	usleep_range(10000, 10500); /* 10ms delay recommended by spec */
 
 	/* Test Mode */
@@ -385,8 +404,7 @@ static int sn65dsi84_bridge_attach(struct drm_bridge *bridge)
         /* TODO: setting to 4 MIPI lanes always for now */
         dsi->lanes = 4;
         dsi->format = MIPI_DSI_FMT_RGB888;
-        dsi->mode_flags = MIPI_DSI_MODE_VIDEO |  MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
-
+	dsi->mode_flags = pdata->mode_flags;
 
 	ret = mipi_dsi_attach(dsi);
 	if (ret < 0) {
